@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import shutil
 from flask_cors import CORS
-from station_controllers import get_stations, copy_to_inputs_folder
+from station_controllers import get_stations, copy_to_inputs_folder, copy_files_to_output
 from file_checker import check_documents
 from file_converter import process_excel
 from pdf_converter import process_pdf
@@ -20,6 +20,10 @@ def get_all_stations():
 @app.route('/api/run-documents', methods=['POST'])
 def copy_to_inputs():
     return copy_to_inputs_folder()
+
+@app.route('/api/copy-files', methods=['POST'])
+def copy_files_to_outputs():
+    return copy_files_to_output()
     
 
 @app.route('/api/check-documents', methods=['POST'])

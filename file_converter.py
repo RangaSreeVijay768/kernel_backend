@@ -6,9 +6,9 @@ from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-from calculations_nt import calculate_values as calculate_values_nt, TagInfo as TagInfoNT, TagDir as TagDirNT
+from calculations_nt import generate_pages_for_tag as calculate_values_nt, TagInfo as TagInfoNT, TagDir as TagDirNT
 from calculations_aline import calculate_values as calculate_values_aline, TagInfo as TagInfoAline, TagDir as TagDirAline
-from calculations_adj import calculate_values as calculate_values_adj, TagInfo as TagInfoAdj, TagDir as TagDirAdj
+from calculations_adj import generate_pages_for_tag as calculate_values_adj, TagInfo as TagInfoAdj, TagDir as TagDirAdj
 
 app = Flask(__name__)
 
@@ -50,11 +50,11 @@ def format_sheet(ws, df, tag_title):
 
     for i in range(total_chunks):
         footer_values = {
-            "division": {"value": "Secunderabad", "size": 22},
-            "railways": {"value": "South Central Railway", "size": 22},
-            "station-name": {"value": "Malwan", "size": 22},
-            "station-id": {"value": "MW123", "size": 22},
-            "date": {"value": "11-07-2025", "size": 22},
+            "division": {"value": "PRAYAGRAJ Division", "size": 22},
+            "railways": {"value": "NC RAILWAYS", "size": 22},
+            "station-name": {"value": "MALWAN(MWH)", "size": 22},
+            "station-id": {"value": "Section Id: 37111", "size": 22},
+            "date": {"value": "25-07-2025", "size": 22},
             "total-pages": {"value": str(total_chunks), "size": 22},
             "current-page": {"value": str(i + 1), "size": 22}
         }
@@ -129,6 +129,8 @@ def format_sheet(ws, df, tag_title):
         except NameError:
             print(f"Footer skipped for chunk {i+1} in sheet with title: {tag_title}")
         current_row += len(footer_template["template"]) + 6
+
+
 
 def process_input_sheet(sheet_name, df):
     print(f"\nProcessing sheet: {sheet_name}")
@@ -273,10 +275,18 @@ def process_input_sheet(sheet_name, df):
                     ]
                 )
 
-                result = calculate_values_nt(tag)
-                crc_str = f"{result.crc:08X}".lower()
-                page_x = result.page_x.hex().lower()
-                page_y = result.page_y.hex().lower()
+                page1, page2, crc = calculate_values_nt(tag)
+                def format_page(page: bytearray) -> str:
+                    trimmed = page[:8]
+                    while trimmed and trimmed[-1] == 0x00 and len(trimmed) > 6:
+                        trimmed = trimmed[:-1]
+                    return ''.join(f"{b:02x}" for b in trimmed)
+
+                # Format output
+                crc_str = f"{crc:08x}"
+                page_x = format_page(page1)
+                page_y = format_page(page2)
+
 
             elif sheet_name == 'AlineT':
                 uctypeofTag = int(df.at[aline_field_mapping['uctypeofTag'], col]) if aline_field_mapping['uctypeofTag'] in df.index else 11
@@ -333,32 +343,32 @@ def process_input_sheet(sheet_name, df):
                 comMarkNominal = int(df.at[adj_field_mapping['comMarkNominal'], col]) if adj_field_mapping['comMarkNominal'] in df.index else 0
                 comMarkReverse = int(df.at[adj_field_mapping['comMarkReverse'], col]) if adj_field_mapping['comMarkReverse'] in df.index else 0
 
+
                 tag = TagInfoAdj(
                     uctypeofTag=uctypeofTag,
                     uc_version=uc_version,
                     uiUniqueID=uiUniqueID,
-                    fAbsLoc1=fAbsLoc1,
-                    fAbsLoc2=fAbsLoc2,
                     stDir=[
-                        TagDirAdj(nominal_ucTin),
-                        TagDirAdj(reverse_ucTin)
+                        TagDirAdj(nominal_ucTin, secTypeNominal, dirResetAbsLoc1, comMarkNominal, fAbsLoc1),
+                        TagDirAdj(reverse_ucTin, secTypeReverse, dirResetAbsLoc2, comMarkReverse, fAbsLoc2)
                     ],
-                    dirResetAbsLoc1=dirResetAbsLoc1,
-                    dirResetAbsLoc2=dirResetAbsLoc2,
                     locCorrectionType=locCorrectionType,
                     reserved=reserved,
-                    secTypeNominal=secTypeNominal,
-                    secTypeReverse=secTypeReverse,
                     reserved1=reserved1,
-                    tagType=tagType,
-                    comMarkNominal=comMarkNominal,
-                    comMarkReverse=comMarkReverse
+                    tagType=tagType
                 )
+                
+                page1, page2, crc = calculate_values_adj(tag)
+                def format_page(page: bytearray) -> str:
+                    trimmed = page[:8]
+                    while trimmed and trimmed[-1] == 0x00 and len(trimmed) > 6:
+                        trimmed = trimmed[:-1]
+                    return ''.join(f"{b:02x}" for b in trimmed)
 
-                result = calculate_values_adj(tag)
-                crc_str = f"{result.crc:08X}".lower()
-                page_x = result.page_x.hex().lower()
-                page_y = result.page_y.hex().lower()
+                # Format output
+                crc_str = f"{crc:08x}"
+                page_x = format_page(page1)
+                page_y = format_page(page2)
 
             else:
                 crc_str = 0
@@ -395,6 +405,14 @@ def process_excel():
 
         if not os.path.isdir(os.path.dirname(output_path)):
             return jsonify({"error": "Invalid output directory"}), 400
+        
+        drive = os.path.splitdrive(output_path)[0]
+        if drive and not os.path.exists(drive):
+            return jsonify({"error": f"Drive {drive} does not exist or is not accessible"}), 400
+
+        # Create full output directory if not present
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
 
         # Generate output file name by appending '_formatted' to input file name
         input_filename = os.path.splitext(os.path.basename(input_path))[0]
@@ -403,11 +421,8 @@ def process_excel():
         output_file = os.path.join(output_path, f"{base_output_filename}{output_extension}")
         
         # Check for existing files and append (1), (2), etc., if necessary
-        counter = 1
-        while os.path.isfile(output_file):
-            output_filename = f"{base_output_filename}({counter}){output_extension}"
-            output_file = os.path.join(output_path, output_filename)
-            counter += 1
+        if os.path.isfile(output_file):
+            os.remove(output_file)
         
         wb = Workbook()
         all_sheets = pd.read_excel(input_path, sheet_name=None, header=1)
@@ -446,63 +461,5 @@ def process_excel():
 
     except Exception as e:
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
-# def process_excel():
-#     try:
-#         if 'file' not in request.files or 'output_path' not in request.form:
-#             return jsonify({"error": "Missing file or output path"}), 400
 
-#         file = request.files['file']
-#         output_path = request.form['output_path']
-        
-#         if not file.filename.endswith('.xlsx'):
-#             return jsonify({"error": "Invalid file format. Please upload an .xlsx file"}), 400
 
-#         if not os.path.isdir(os.path.dirname(output_path)):
-#             return jsonify({"error": "Invalid output directory"}), 400
-
-#         # Generate output file name by appending '_formatted' to input file name
-#         input_filename = os.path.splitext(file.filename)[0]
-#         output_filename = f"{input_filename}_formatted.xlsx"
-#         output_file = os.path.join(output_path, output_filename)
-        
-#         wb = Workbook()
-#         all_sheets = pd.read_excel(file, sheet_name=None, header=1)
-#         all_raw = pd.read_excel(file, sheet_name=None, header=None)
-#         first = True
-#         processed_sheets = 0
-
-#         for sheet_name, df in all_sheets.items():
-#             raw_df = all_raw[sheet_name]
-#             tag_title = str(raw_df.iloc[0, 0]) if not raw_df.empty else "TAG"
-
-#             formatted_df = process_input_sheet(sheet_name, df)
-#             if formatted_df is None:
-#                 print(f"Skipping sheet {sheet_name} — no valid tag data.")
-#                 continue
-
-#             ws = wb.active if first else wb.create_sheet()
-#             ws.title = sheet_name
-#             first = False
-#             processed_sheets += 1
-
-#             format_sheet(ws, formatted_df, tag_title)
-
-#         if processed_sheets == 0:
-#             return jsonify({"error": "No sheets processed. Output file not saved."}), 400
-
-#         wb.save(output_file)
-#         print(f"✅ Final Excel saved: {output_file}")
-
-#         return send_file(
-#             output_file,
-#             as_attachment=True,
-#             download_name=output_filename,
-#             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-#         )
-
-#     except Exception as e:
-#         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
-    
-    
-    
-    

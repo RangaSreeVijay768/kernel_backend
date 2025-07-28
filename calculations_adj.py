@@ -1,204 +1,9 @@
-# import pandas as pd
-# from typing import Tuple
-# from dataclasses import dataclass
-
-# @dataclass
-# class TagDir:
-#     ucTin: int
-
-# @dataclass
-# class TagInfo:
-#     uctypeofTag: int
-#     uc_version: int
-#     uiUniqueID: int
-#     fAbsLoc1: int
-#     fAbsLoc2: int
-#     stDir: list[TagDir]
-#     dirResetAbsLoc1: int
-#     dirResetAbsLoc2: int
-#     locCorrectionType: int
-#     reserved: int
-#     secTypeNominal: int
-#     secTypeReverse: int
-#     reserved1: int
-#     tagType: int
-#     comMarkNominal: int
-#     comMarkReverse: int
-
-# @dataclass
-# class TagEncodedResult:
-#     page_x: bytes
-#     page_y: bytes
-#     crc: int
-
-# order = 30
-# polynom = 0x2030B9C7
-# crcinit = 0x3FFFFFFF
-# crcxor = 0x3FFFFFFF
-# direct = 1
-# refin = 0
-# refout = 0
-
-# crcmask = ((((1 << (order - 1)) - 1) << 1) | 1)
-# crchighbit = 1 << (order - 1)
-# crctab = [0] * 256
-
-# def generate_crc_table():
-#     for i in range(256):
-#         crc = i
-#         if refin:
-#             crc = reflect(crc, 8)
-#         crc <<= order - 8
-#         for j in range(8):
-#             bit = crc & crchighbit
-#             crc <<= 1
-#             if bit:
-#                 crc ^= polynom
-#         if refin:
-#             crc = reflect(crc, order)
-#         crc &= crcmask
-#         crctab[i] = crc
-
-# def reflect(crc: int, bitnum: int) -> int:
-#     crcout = 0
-#     for i in range(bitnum - 1, -1, -1):
-#         if crc & (1 << i):
-#             crcout |= 1 << (bitnum - 1 - i)
-#     return crcout
-
-# def crcbitbybitfast(data: bytes, length: int) -> int:
-#     crc = crcinit
-#     for i in range(length):
-#         c = data[i]
-#         if refin:
-#             c = reflect(c, 8)
-#         for j in range(0x80, 0, -1):
-#             bit = crc & crchighbit
-#             crc <<= 1
-#             if c & j:
-#                 bit ^= crchighbit
-#             if bit:
-#                 crc ^= polynom
-#     if refout:
-#         crc = reflect(crc, order)
-#     crc ^= crcxor
-#     crc &= crcmask
-#     return crc
-
-
-
-# def insert_bits(start: int, nbits: int, buf: bytearray, data: int, offset: int) -> int:
-#     iBitPos = start + nbits
-#     if iBitPos <= 8:
-#         iNBytes = 1
-#         iStart = 7 - start
-#     elif iBitPos <= 16:
-#         iNBytes = 2
-#         iStart = 15 - start
-#     elif iBitPos <= 24:
-#         iNBytes = 3
-#         iStart = 23 - start
-#     else:
-#         iNBytes = 4
-#         iStart = 31 - start
-
-#     if offset + iNBytes > len(buf):
-#         raise ValueError(f"bytearray index out of range: offset={offset}, required={iNBytes}, buffer len={len(buf)}")
-
-#     ulDataBits = 0
-#     pucMsg = buf[offset:offset + iNBytes]
-#     for i in range(iNBytes):
-#         ulDataBits <<= 8
-#         ulDataBits |= pucMsg[i]
-#     iShiftCount = iStart - nbits + 1
-#     ulBitMask = (1 << nbits) - 1
-#     data &= ulBitMask
-#     data <<= iShiftCount
-#     ulDataBits &= ~(ulBitMask << iShiftCount)
-#     ulDataBits |= data
-#     for i in range(iNBytes - 1, -1, -1):
-#         buf[offset + i] = (ulDataBits >> (8 * (iNBytes - 1 - i))) & 0xFF
-#     return ulDataBits
-
-# def calculate_values(tag: TagInfo) -> TagEncodedResult:
-#     page_x = bytearray(8)
-#     page_y = bytearray(8)
-#     total = bytearray(16)
-
-#     # Ensure 8-bit truncation where necessary
-#     insert_bits(4, 4, page_x, tag.uctypeofTag & 0xF, offset=7)  # X3-X0
-#     insert_bits(2, 2, page_x, tag.uc_version & 0x3, offset=7)   # X5-X4
-#     insert_bits(0, 10, page_x, tag.uiUniqueID & 0x3FF, offset=6) # X15-X6
-#     insert_bits(1, 23, page_x, tag.fAbsLoc1 & 0x7FFFFF, offset=3) # X38-X16
-#     insert_bits(1, 8, page_x, tag.stDir[0].ucTin & 0xFF, offset=2) # X46-X39
-#     insert_bits(1, 8, page_x, tag.stDir[1].ucTin & 0xFF, offset=1) # X54-X47
-#     first_half = tag.fAbsLoc2 & 0x1FF  # Lower 9 bits (X63-X55)
-#     second_half = (tag.fAbsLoc2 >> 9) & 0x7FFF  # Upper 15 bits (Y14-Y0)
-#     insert_bits(0, 9, page_x, first_half, offset=0)  # X63-X55
-
-#     insert_bits(0, 15, page_y, second_half, offset=6)  # Y14-Y0 (starts at bit 0 of page_y[6])
-#     insert_bits(1, 3, page_y, tag.dirResetAbsLoc1 & 0x7, offset=6)  # Y16-Y14
-#     insert_bits(4, 3, page_y, tag.dirResetAbsLoc2 & 0x7, offset=5)  # Y19-Y17
-#     insert_bits(0, 1, page_y, tag.locCorrectionType & 0x1, offset=5)  # Y20
-#     insert_bits(1, 2, page_y, tag.reserved & 0x3, offset=4)  # Y22-Y21
-#     insert_bits(7, 2, page_y, tag.secTypeNominal & 0x3, offset=3)  # Y24-Y23
-#     insert_bits(5, 2, page_y, tag.secTypeReverse & 0x3, offset=3)  # Y26-Y25
-#     insert_bits(2, 4, page_y, tag.reserved1 & 0xF, offset=3)  # Y30-Y27
-#     insert_bits(1, 1, page_y, tag.tagType & 0x1, offset=3)  # Y31
-#     insert_bits(7, 1, page_y, tag.comMarkNominal & 0x1, offset=2)  # Y32
-#     insert_bits(6, 1, page_y, tag.comMarkReverse & 0x1, offset=2)  # Y33
-
-#     # Build total with page_x reversed
-#     for i in range(8):
-#         total[i] = page_x[7 - i]
-#     for i in range(8, 13):
-#         total[i] = page_y[7 - (i - 8)]
-
-#     crcc = crcbitbybitfast(total[:13], 13)
-#     insert_bits(0, 30, page_y, crcc, offset=0)  # Y63-Y34
-
-#     return TagEncodedResult(bytes(page_x), bytes(page_y), crcc)
-
-# generate_crc_table()
-
-
-
-
-
-
 import pandas as pd
 from typing import Tuple
 from dataclasses import dataclass
 
-@dataclass
-class TagDir:
-    ucTin: int
 
-@dataclass
-class TagInfo:
-    uctypeofTag: int
-    uc_version: int
-    uiUniqueID: int
-    fAbsLoc1: int
-    fAbsLoc2: int
-    stDir: list[TagDir]
-    dirResetAbsLoc1: int
-    dirResetAbsLoc2: int
-    locCorrectionType: int
-    reserved: int
-    secTypeNominal: int
-    secTypeReverse: int
-    reserved1: int
-    tagType: int
-    comMarkNominal: int
-    comMarkReverse: int
-
-@dataclass
-class TagEncodedResult:
-    page_x: bytes
-    page_y: bytes
-    crc: int
-
+# CRC constants
 order = 30
 polynom = 0x2030B9C7
 crcinit = 0x3FFFFFFF
@@ -207,97 +12,192 @@ direct = 1
 refin = 0
 refout = 0
 
-crcmask = ((((1 << (order - 1)) - 1) << 1) | 1)
+# Internal global values
+crcmask = (((1 << (order - 1)) - 1) << 1) | 1
 crchighbit = 1 << (order - 1)
+crcinit_direct = 0
+crcinit_nondirect = 0
+crctab = [0] * 256
 
-def crc30_cdma(data: bytes, length: int) -> int:
-    crc = 0x3FFFFFFF
-    for i in range(length):
-        crc ^= (data[i] << 22)
-        for bit in range(8):
-            if crc & 0x20000000:
-                crc = (crc << 1) ^ 0x2030B9C7
-            else:
-                crc <<= 1
-            crc &= 0x3FFFFFFF
-    crc ^= 0x3FFFFFFF
-    return crc & 0x3FFFFFFF
+
+ulAdMask = [
+    0x0,
+    0x1, 0x3, 0x7, 0xF,
+    0x1F, 0x3F, 0x7F, 0xFF,
+    0x1FF, 0x3FF, 0x7FF, 0xFFF,
+    0x1FFF, 0x3FFF, 0x7FFF, 0xFFFF,
+    0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF,
+    0x1FFFFF, 0x3FFFFF, 0x7FFFFF, 0xFFFFFF,
+    0x1FFFFFF, 0x3FFFFFF, 0x7FFFFFF, 0xFFFFFFF,
+    0x1FFFFFFF, 0x3FFFFFFF, 0x7FFFFFFF, 0xFFFFFFFF
+]
+
+
+
+@dataclass
+class TagDir:
+    ucTin: int
+    secType: int
+    dirResetAbsLoc: int
+    comMark: int
+    fAbsLoc: int
+
+@dataclass
+class TagInfo:
+    uctypeofTag: int
+    uc_version: int
+    uiUniqueID: int
+    stDir: list[TagDir]
+    locCorrectionType: int
+    reserved: int
+    reserved1: int
+    tagType: int
+
 
 def reflect(crc: int, bitnum: int) -> int:
     crcout = 0
-    for i in range(bitnum - 1, -1, -1):
+    for i in range(bitnum):
         if crc & (1 << i):
             crcout |= 1 << (bitnum - 1 - i)
     return crcout
 
-def insert_bits(start: int, nbits: int, buf: bytearray, data: int, offset: int) -> int:
-    iBitPos = start + nbits
-    if iBitPos <= 8:
-        iNBytes = 1
-        iStart = 7 - start
-    elif iBitPos <= 16:
-        iNBytes = 2
-        iStart = 15 - start
-    elif iBitPos <= 24:
-        iNBytes = 3
-        iStart = 23 - start
-    else:
-        iNBytes = 4
-        iStart = 31 - start
 
-    if offset + iNBytes > len(buf):
-        raise ValueError(f"bytearray index out of range: offset={offset}, required={iNBytes}, buffer len={len(buf)}")
+def generate_crc_table():
+    for i in range(256):
+        crc = i
+        if refin:
+            crc = reflect(crc, 8)
+        crc <<= (order - 8)
+        for _ in range(8):
+            if crc & crchighbit:
+                crc = (crc << 1) ^ polynom
+            else:
+                crc <<= 1
+        if refin:
+            crc = reflect(crc, order)
+        crc &= crcmask
+        crctab[i] = crc
+
+
+def crcbitbybitfast(p: bytearray, length: int) -> int:
+    crc = crcinit_direct
+    for byte in p[:length]:
+        c = byte
+        if refin:
+            c = reflect(c, 8)
+        for j in range(8)[::-1]:
+            bit = crc & crchighbit
+            crc <<= 1
+            if c & (1 << j):
+                bit ^= crchighbit
+            if bit:
+                crc ^= polynom
+    if refout:
+        crc = reflect(crc, order)
+    crc ^= crcxor
+    crc &= crcmask
+    return crc
+
+def InsertBits(iStart: int, iNoOfBits: int, pucMsg: bytearray, offset: int, ulDataIn: int) -> int:
+    iBitPos = iStart + iNoOfBits
+
+    if iBitPos <= 8:
+        iStart = 7 - iStart
+        iNBytes = 1
+    elif iBitPos <= 16:
+        iStart = 15 - iStart
+        iNBytes = 2
+    else:
+        iStart = 31 - iStart
+        iNBytes = 4
+
+    # 🔧 Ensure sufficient size in pucMsg
+    required_size = offset + iNBytes
+    if required_size > len(pucMsg):
+        pucMsg.extend([0] * (required_size - len(pucMsg)))
 
     ulDataBits = 0
-    pucMsg = buf[offset:offset + iNBytes]
     for i in range(iNBytes):
-        ulDataBits <<= 8
-        ulDataBits |= pucMsg[i]
-    iShiftCount = iStart - nbits + 1
-    ulBitMask = (1 << nbits) - 1
-    data &= ulBitMask
-    data <<= iShiftCount
+        ulDataBits = (ulDataBits << 8) | pucMsg[offset + i]
+
+    iShiftCount = iStart - iNoOfBits + 1
+    ulBitMask = ulAdMask[iNoOfBits]
+    ulDataIn &= ulBitMask
+    ulDataIn <<= iShiftCount
     ulDataBits &= ~(ulBitMask << iShiftCount)
-    ulDataBits |= data
-    for i in range(iNBytes - 1, -1, -1):
-        buf[offset + i] = (ulDataBits >> (8 * (iNBytes - 1 - i))) & 0xFF
+    ulDataBits |= ulDataIn
+
+    for i in range(iNBytes):
+        pucMsg[offset + i] = (ulDataBits >> (8 * (iNBytes - 1 - i))) & 0xFF
+
     return ulDataBits
 
-def calculate_values(tag: TagInfo) -> TagEncodedResult:
-    page_x = bytearray(8)
-    page_y = bytearray(8)
-    total = bytearray(16)
 
-    # Ensure 8-bit truncation where necessary
-    insert_bits(4, 4, page_x, tag.uctypeofTag & 0xF, offset=7)  # X3-X0
-    insert_bits(2, 2, page_x, tag.uc_version & 0x3, offset=7)   # X5-X4
-    insert_bits(0, 10, page_x, tag.uiUniqueID & 0x3FF, offset=6) # X15-X6
-    insert_bits(1, 23, page_x, tag.fAbsLoc1 & 0x7FFFFF, offset=3) # X38-X16
-    insert_bits(1, 8, page_x, tag.stDir[0].ucTin & 0xFF, offset=2) # X46-X39
-    insert_bits(1, 8, page_x, tag.stDir[1].ucTin & 0xFF, offset=1) # X54-X47
-    first_half = tag.fAbsLoc2 & 0x1FF  # Lower 9 bits (X63-X55)
-    second_half = (tag.fAbsLoc2 >> 9) & 0x7FFF  # Upper 15 bits (Y14-Y0)
-    insert_bits(0, 9, page_x, first_half, offset=0)  # X63-X55
 
-    insert_bits(0, 15, page_y, second_half, offset=6)  # Y14-Y0
-    insert_bits(1, 3, page_y, tag.dirResetAbsLoc1 & 0x7, offset=6)  # Y16-Y14
-    insert_bits(4, 3, page_y, tag.dirResetAbsLoc2 & 0x7, offset=5)  # Y19-Y17
-    insert_bits(0, 1, page_y, tag.locCorrectionType & 0x1, offset=5)  # Y20
-    insert_bits(1, 2, page_y, tag.reserved & 0x3, offset=4)  # Y22-Y21
-    insert_bits(7, 2, page_y, tag.secTypeNominal & 0x3, offset=3)  # Y24-Y23
-    insert_bits(5, 2, page_y, tag.secTypeReverse & 0x3, offset=3)  # Y26-Y25
-    insert_bits(2, 4, page_y, tag.reserved1 & 0xF, offset=3)  # Y30-Y27
-    insert_bits(1, 1, page_y, tag.tagType & 0x1, offset=3)  # Y31
-    insert_bits(7, 1, page_y, tag.comMarkNominal & 0x1, offset=2)  # Y32
-    insert_bits(6, 1, page_y, tag.comMarkReverse & 0x1, offset=2)  # Y33
+def process_taginfo(tag: TagInfo):
+    page1 = bytearray(8)
+    page2 = bytearray(8)
+    total_pages = bytearray(16)
 
-    # Build total with page_x reversed
+    InsertBits(4, 4, page1, 7, tag.uctypeofTag)                  # Y3-Y0
+    InsertBits(2, 2, page1, 7, tag.uc_version)                  # Y5-Y4
+    InsertBits(0, 10, page1, 6, tag.uiUniqueID)                 # Y15-Y6
+    InsertBits(1, 23, page1, 3, tag.stDir[0].fAbsLoc)           # Y38-Y16
+    InsertBits(1, 8, page1, 2, tag.stDir[0].ucTin)              # Y46-Y39
+    InsertBits(1, 8, page1, 1, tag.stDir[1].ucTin)              # Y54-Y47
+
+    first_half = tag.stDir[1].fAbsLoc & 0x1FF                   # Y63-Y55
+    second_half = tag.stDir[1].fAbsLoc >> 9                     # Y14-Y0
+    InsertBits(0, 9, page1, 0, first_half)                      # Y63-Y55
+    InsertBits(2, 14, page2, 6, second_half)                    # Y14-Y0
+
+    InsertBits(7, 3, page2, 5, tag.stDir[0].dirResetAbsLoc)     # Y16-Y14
+    InsertBits(4, 3, page2, 5, tag.stDir[1].dirResetAbsLoc)     # Y19-Y17
+    InsertBits(3, 1, page2, 5, tag.locCorrectionType)           # Y20
+    # InsertBits(1, 2, page2, 0, tag.reserved)                    # Y22-Y21
+    InsertBits(7, 2, page2, 4, tag.stDir[0].secType)            # Y24-Y23
+    InsertBits(5, 2, page2, 4, tag.stDir[1].secType)            # Y26-Y25
+    # InsertBits(1, 4, page2, 3, tag.reserved1)                   # Y30-Y27
+    InsertBits(0, 1, page2, 4, tag.tagType)                     # Y31
+    InsertBits(7, 1, page2, 3, tag.stDir[0].comMark)            # Y32
+    InsertBits(6, 1, page2, 3, tag.stDir[1].comMark)            # Y33
+
     for i in range(8):
-        total[i] = page_x[7 - i]
-    for i in range(8, 13):
-        total[i] = page_y[7 - (i - 8)]
+        total_pages[i] = page1[7 - i]
+    for i in range(5):
+        total_pages[8 + i] = page2[7 - i]
 
-    crcc = crc30_cdma(total[:13], 13)
-    insert_bits(0, 30, page_y, crcc, offset=0)  # Y63-Y34
+    crc = crcbitbybitfast(total_pages, 13)
+    InsertBits(0, 30, page2, 0, crc)                            # Y63-Y34
 
-    return TagEncodedResult(bytes(page_x), bytes(page_y), crcc)
+    return page1, page2, crc
+
+
+
+def generate_pages_for_tag(tag: TagInfo):
+    generate_crc_table()
+    if not direct:
+        crc = crcinit
+        for _ in range(order):
+            bit = crc & crchighbit
+            crc <<= 1
+            if bit:
+                crc ^= polynom
+        crc &= crcmask
+        globals()['crcinit_direct'] = crc
+        globals()['crcinit_nondirect'] = crcinit
+    else:
+        crc = crcinit
+        for _ in range(order):
+            bit = crc & 1
+            crc >>= 1
+            if bit:
+                crc ^= polynom
+                crc |= crchighbit
+        globals()['crcinit_nondirect'] = crc
+        globals()['crcinit_direct'] = crcinit
+
+    return process_taginfo(tag)
+
+
+

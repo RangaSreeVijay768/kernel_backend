@@ -61,26 +61,6 @@ def reflect(crc: int, bitnum: int) -> int:
             crcout |= 1 << (bitnum - 1 - i)
     return crcout
 
-# def crcbitbybitfast(data: bytes, length: int) -> int:
-#     crc = crcinit
-#     for i in range(length):
-#         c = data[i]
-#         if refin:
-#             c = reflect(c, 8)
-#         for j in range(0x80, 0, -1):
-#             bit = crc & crchighbit
-#             crc <<= 1
-#             if c & j:
-#                 bit ^= crchighbit
-#             if bit:
-#                 crc ^= polynom
-#     if refout:
-#         crc = reflect(crc, order)
-#     crc ^= crcxor
-#     crc &= crcmask
-#     return crc
-
-
 
 def crc30_cdma(data: bytes, length: int) -> int:
     crc = 0x3FFFFFFF
@@ -150,8 +130,7 @@ def calculate_values(tag: TagInfo) -> TagEncodedResult:
     insert_bits(1, 8, pagey, tag.AdjLine3_tin & 0xFF, offset=6)
     insert_bits(1, 8, pagey, tag.AdjLine4_tin & 0xFF, offset=5)
     insert_bits(1, 8, pagey, tag.AdjLine5_tin & 0xFF, offset=4)
-    insert_bits(7, 1, pagey, tag.ucTagDuplication & 0x1, offset=3)  # Y31
-    insert_bits(6, 2, pagey, 0, offset=3)  # Y33-Y32
+    insert_bits(0, 1, pagey, tag.ucTagDuplication & 0x1, offset=4)  # Y31
 
     for i in range(8):
         total[i] = pagex[7 - i]
@@ -160,53 +139,51 @@ def calculate_values(tag: TagInfo) -> TagEncodedResult:
         
     crcc = crc30_cdma(total[:13], 13)
     insert_bits(0, 30, pagey, crcc, offset=0)
-    
-    print("---- Debug Info ----")
-    print("Type:", tag.uctypeofTag, "/ Ver:", tag.uc_version, "/ ID:", tag.uiUniqueID)
-    print("AbsLoc:", tag.fAbsLoc)
-    print("Dir1:", tag.stDir[0].ucTin, "Dir2:", tag.stDir[1].ucTin)
-    print("AdjLines:", tag.AdjLine1_tin, tag.AdjLine2_tin, tag.AdjLine3_tin, tag.AdjLine4_tin, tag.AdjLine5_tin)
-    print("Dup:", tag.ucTagDuplication)
-    print("PageX:", pagex.hex())
-    print("PageY:", pagey.hex())
-    print("Total for CRC:", total[:13].hex())
-    print("CRC:", hex(crcc))
-    print("--------------------")
 
 
     return TagEncodedResult(bytes(pagex), bytes(pagey), crcc)
 
 
-# def calculate_values(tag: TagInfo) -> TagEncodedResult:
-#     pagex = bytearray(8)
-#     pagey = bytearray(8)
-#     total = bytearray(16)
 
-#     # Ensure 8-bit truncation
-#     insert_bits(4, 4, pagex, tag.uctypeofTag & 0xF, offset=7)
-#     insert_bits(2, 2, pagex, tag.uc_version & 0x3, offset=7)
-#     insert_bits(0, 10, pagex, tag.uiUniqueID & 0x3FF, offset=6)
-#     insert_bits(1, 23, pagex, tag.fAbsLoc & 0x7FFFFF, offset=3)
-#     insert_bits(1, 8, pagex, tag.stDir[0].ucTin & 0xFF, offset=2)
-#     insert_bits(1, 8, pagex, tag.stDir[1].ucTin & 0xFF, offset=1)
-#     insert_bits(1, 8, pagex, tag.AdjLine1_tin & 0xFF, offset=0)
-#     first_half = tag.AdjLine2_tin & 0x01
-#     second_half = (tag.AdjLine2_tin >> 1) & 0x7F
-#     insert_bits(0, 1, pagex, first_half, offset=0)
-#     insert_bits(1, 7, pagey, second_half, offset=7)
-#     insert_bits(1, 8, pagey, tag.AdjLine3_tin & 0xFF, offset=6)
-#     insert_bits(1, 8, pagey, tag.AdjLine4_tin & 0xFF, offset=5)
-#     insert_bits(1, 8, pagey, tag.AdjLine5_tin & 0xFF, offset=4)
+# def main():
+#     # Sample test case 1
+#     tag1 = TagInfo(
+#         uctypeofTag=11,
+#         uc_version=1,
+#         uiUniqueID=53,
+#         fAbsLoc=1349909,
+#         stDir=[TagDir(ucTin=73), TagDir(ucTin=73)],
+#         AdjLine1_tin=75,
+#         AdjLine2_tin=74,
+#         AdjLine3_tin=0,
+#         AdjLine4_tin=0,
+#         AdjLine5_tin=0,
+#         ucTagDuplication=0
+#     )
 
-#     # Build total with pagex reversed
-#     for i in range(8):
-#         total[i] = pagex[7 - i]
-#     for i in range(8, 13):
-#         total[i] = pagey[7 - (i - 8)]
+#     # Sample test case 2
+#     tag2 = TagInfo(
+#         uctypeofTag=11,
+#         uc_version=1,
+#         uiUniqueID=53,
+#         fAbsLoc=1349913,
+#         stDir=[TagDir(ucTin=73), TagDir(ucTin=73)],
+#         AdjLine1_tin=75,
+#         AdjLine2_tin=74,
+#         AdjLine3_tin=0,
+#         AdjLine4_tin=0,
+#         AdjLine5_tin=0,
+#         ucTagDuplication=1
+#     )
 
-#     crcc = crc30_cdma(total[:13], 13)
-#     insert_bits(0, 30, pagey, crcc, offset=0)
+#     tags = [tag1, tag2]
 
-#     return TagEncodedResult(bytes(pagex), bytes(pagey), crcc)
+#     for i, tag in enumerate(tags):
+#         result = calculate_values(tag)
+#         print("Page X:", result.page_x.hex().lower())
+#         print("Page Y:", result.page_y.hex().lower())
+#         print("CRC   :", f"{result.crc:08X}".lower())
 
-generate_crc_table()
+
+# if __name__ == "__main__":
+#     main()
