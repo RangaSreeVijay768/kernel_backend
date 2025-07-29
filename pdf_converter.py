@@ -516,7 +516,7 @@ def process_pdf():
         # Setup PDF document
         doc = SimpleDocTemplate(
             output_file,
-            pagesize=(A3[1], A3[0]),  # Landscape mode
+            pagesize=(A3[1], A3[0]),  # Landscape modex
             rightMargin=10 * mm,
             leftMargin=10 * mm,
             topMargin=10 * mm,

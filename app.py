@@ -6,6 +6,7 @@ from station_controllers import get_stations, copy_to_inputs_folder, copy_files_
 from file_checker import check_documents
 from file_converter import process_excel
 from pdf_converter import process_pdf
+from rfid_pdf_generator import generate_pdf_with_rfid_image
 
 app = Flask(__name__)
 CORS(app)
@@ -37,6 +38,10 @@ def process_excel_route():
 @app.route('/api/generate-pdf', methods=['POST'])
 def generate_pdf_route():
     return process_pdf()
+
+@app.route('/api/generate-rfid-pdf', methods=['POST'])
+def generate_rdid_pdf_route():
+    return generate_pdf_with_rfid_image()
 
 
 if __name__ == '__main__':
