@@ -1,4 +1,6 @@
-from reportlab.lib.units import mm
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import Table, TableStyle, Paragraph
 
 
 def draw_title_block_on_pdf(c, x0, y0, width, total_height):
@@ -105,7 +107,7 @@ def draw_title_block_on_pdf(c, x0, y0, width, total_height):
 
     # Header
     c.line(legend_x, legend_y + legend_height - 15, legend_x + legend_width, legend_y + legend_height - 15)
-    c.setFont("Helvetica-Bold", 10)
+    c.setFont("Helvetica-Bold", 11)
     c.drawCentredString(legend_x + legend_width / 2, legend_y + legend_height - 12, "LEGEND")
 
     # Rows (each approx. 12 px high)
@@ -119,8 +121,8 @@ def draw_title_block_on_pdf(c, x0, y0, width, total_height):
         ("A", "ADJUSTMENT/JUNCTION TAG"),
     ]
 
-    row_height = 12
-    triangle_size = 7
+    row_height = 18
+    triangle_size = 12
     for i, (code, label) in enumerate(legend_items):
         y_pos = legend_y + legend_height - 15 - (i + 1) * row_height + 3
         x_pos = legend_x + 5
@@ -341,3 +343,186 @@ def draw_direction_arrows(c, x_center, y_center, length=40, spacing=15):
     # Labels
     c.drawRightString(x_center - half_length - 5, y2 - 4, "Reverse")
     c.drawString(x_center + half_length + 5, y2 - 4, "Nominal")
+
+
+
+
+def draw_combined_station_and_border_table(c, x0, y0, width, height=None):
+    styles = getSampleStyleSheet()
+    para_style = ParagraphStyle(
+        name='WrapStyle',
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        alignment=1,  # center
+    )
+
+    # ----------- STATION DATA ------------
+    station_raw_data = [
+        ["STATION ID", "KKS", "(MWH–RH2–KKS)", "MWH", "(MWH–KSQ)", "KSQ"],
+        ["", "37113", "37112", "37111", "", "37110"],
+        ["RFID", "RANGE", "1–50", "941–999", "901–940", "851–900"],
+        ["", "ALLOTTED",
+         "1,2,3,4,5,6,7,8,9,16,17,18,19,20,21,22,23,24,25,26,27,28,29,36,37,38,39,40,41",
+         "941,942,943,944,945,946,947,948,949,950,951,952,953,954,955,956,957,958,959,960,961,962,963,964,965,966,967,968,969,970,971,972,973,974,975,976,977,978,979,980,981,982,983,984",
+         "901,902,903,904,905,906,907,908,909,910,911,916,917,918,919,920,921,922,923,924,925,926,928,930",
+         "-----"],
+        ["", "SPARE",
+         "10,11,12,13,14,15,30,31,32,33,34,35,42,43,44,45,46,47,48,49,50",
+         "985,986,987,988,989,990,991,992,993,994,995,996,997,998,999",
+         "912,913,914,915,927,929,931,932,933,934,935,936,937,938,939,940",
+         "-----"],
+        ["TIN", "RANGE", "236–240", "211–235", "206–210", "197–200"],
+        ["", "ALLOTTED", "237(UP) 236(DN)",
+         "211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,227,229",
+         "207(UP) 206(DN)", "-----"],
+        ["", "SPARE", "238,239,240",
+         "226,228,230,231,232,233,234,235",
+         "208,209,210", "-----"]
+    ]
+
+    station_col_widths = [100, 90, 130, 200, 200, 90]
+    station_data = []
+    station_row_heights = []
+
+    for row in station_raw_data:
+        wrapped_row = []
+        row_height = 0
+        for i, cell in enumerate(row):
+            para = Paragraph(cell.replace(",", ","), para_style)
+            wrapped_row.append(para)
+            # Measure required height for cell content
+            avail_width = station_col_widths[i]
+            _, cell_height = para.wrap(avail_width, 10000)  # High max height
+            row_height = max(row_height, cell_height)
+        station_data.append(wrapped_row)
+        station_row_heights.append(row_height + 10)  # Padding to avoid clipping
+
+    station_table = Table(station_data, colWidths=station_col_widths, rowHeights=station_row_heights)
+    station_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("SPAN", (0, 0), (0, 1)),
+        ("SPAN", (0, 2), (0, 4)),
+        ("SPAN", (0, 5), (0, 7)),
+    ]))
+
+    station_table_width = sum(station_col_widths)
+    station_table.wrapOn(c, width, height or sum(station_row_heights))
+    station_table.drawOn(c, x0, y0)
+    
+    
+        # ------------------ RIGHT: Border Line Tags Table ------------------
+    border_data = [
+        ["BORDER LINE TAGS", "", "", "", ""],
+        ["", "DIRECTION", "TAG ID", "DISTANCE FROM\nMID POINT (MWH)", "SIG STRENGTH AS PER\nRSSI SURVEY"],
+        ["KURASTI KALAN SIDE", "UP", "R–03", "3.168KM", "ABOVE –60db"],
+        ["", "DN", "R–18", "2.779KM", "ABOVE –60db"],
+        ["KANSPUR GUGAULI SIDE", "UP", "R–903", "3.984KM", "ABOVE –60db"],
+        ["", "DN", "R–918", "4.586KM", "ABOVE –60db"],
+    ]
+    border_col_widths = [150, 150, 150, 150, 150]
+    border_row_heights = [40, 40, 35, 35, 35, 35]
+
+    border_table = Table(border_data, colWidths=border_col_widths, rowHeights=border_row_heights)
+    border_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+        ("SPAN", (0, 0), (-1, 0)),  # Title
+        ("SPAN", (0, 2), (0, 3)),  # KURASTI KALAN SIDE
+        ("SPAN", (0, 4), (0, 5)),  # KANSPUR GUGAULI SIDE
+    ]))
+
+    border_table_width = sum(border_col_widths)
+    border_table_x = x0 + station_table_width + 20  # 20 units gap
+    border_table.wrapOn(c, border_table_width, sum(border_row_heights))
+    border_table.drawOn(c, border_table_x, y0)
+
+
+
+# def draw_combined_station_and_border_table(c, x0, y0, width, height=None):
+#     # ------------------ LEFT: Station Tag Table ------------------
+#     station_data = [
+#         ["STATION ID", "KKS", "(MWH–RH2–KKS)", "MWH", "(MWH–KSQ)", "KSQ"],
+#         ["", "37113", "37112", "37111", "", "37110"],
+#         ["RFID", "RANGE", "1–50", "941–999", "901–940", "851–900"],
+#         ["", "ALLOTTED", "1,2,3,4,5,6,7,8,9,16,17,18,19\n20,21,22,23,24,25,26,27,28,29\n36,37,38,39,40,41", 
+#          "941,942,943,944,945,946,947,948,949,950,951,952\n953,954,955,956,957,958,959,960,961,962,963,964\n965,966,967,968,969,970,971,972,973,974,975,976\n977,978,979,980,981,982,983,984", 
+#          "901,902,903,904,905,906,907,908,909,910,911\n916,917,918,919,920,921,922,923,924,925\n926,928,930", 
+#          "-----"],
+#         ["", "SPARE", 
+#          "10,11,12,13,14,15,30,31,32,33,34\n35,42,43,44,45,46,47,48,49,50", 
+#          "985\n986,987,988,989,990,991,992,993,994,995\n996,997,998,999", 
+#          "912,913,914,915\n927,929,931,932,933,934,935,936\n937,938,939,940", 
+#          "-----"],
+#         ["TIN", "RANGE", "236–240", "211–235", "206–210", "197–200"],
+#         ["", "ALLOTTED", "237(UP)\n236(DN)", 
+#          "211,212,213,214,215,216,217,218,219,220\n221,222,223,224,225,227,229", 
+#          "207(UP)\n206(DN)", 
+#          "-----"],
+#         ["", "SPARE", "238,239,240", "226,228,230,231,232,233,234,235", "208,209,210", "-----"]
+#     ]
+#     station_col_widths = [100, 90, 130, 200, 200, 90]
+#     station_row_heights = [28, 24, 24, 50, 48, 24, 45, 45]
+
+#     station_table = Table(station_data, colWidths=station_col_widths, rowHeights=station_row_heights)
+#     station_table.setStyle(TableStyle([
+#         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+#         ("FONTNAME", (0, 1), (-1, 1), "Helvetica"),
+#         ("FONTSIZE", (0, 0), (-1, -1), 8),
+#         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+#         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+#         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+#         ("SPAN", (0, 0), (0, 1)),  # STATION ID
+#         ("SPAN", (0, 2), (0, 4)),  # RFID
+#         ("SPAN", (0, 5), (0, 7)),  # TIN
+#     ]))
+
+#     station_table_width = sum(station_col_widths)
+#     station_table.wrapOn(c, width, height or sum(station_row_heights))
+#     station_table.drawOn(c, x0, y0)
+
+#     # ------------------ RIGHT: Border Line Tags Table ------------------
+#     border_data = [
+#         ["BORDER LINE TAGS", "", "", "", ""],
+#         ["", "DIRECTION", "TAG ID", "DISTANCE FROM\nMID POINT (MWH)", "SIG STRENGTH AS PER\nRSSI SURVEY"],
+#         ["KURASTI KALAN SIDE", "UP", "R–03", "3.168KM", "ABOVE –60db"],
+#         ["", "DN", "R–18", "2.779KM", "ABOVE –60db"],
+#         ["KANSPUR GUGAULI SIDE", "UP", "R–903", "3.984KM", "ABOVE –60db"],
+#         ["", "DN", "R–918", "4.586KM", "ABOVE –60db"],
+#     ]
+#     border_col_widths = [150, 150, 150, 150, 150]
+#     border_row_heights = [30, 30, 25, 25, 25, 25]
+
+#     border_table = Table(border_data, colWidths=border_col_widths, rowHeights=border_row_heights)
+#     border_table.setStyle(TableStyle([
+#         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+#         ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+#         ("FONTSIZE", (0, 0), (-1, -1), 10),
+#         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+#         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+#         ("TOPPADDING", (0, 0), (-1, -1), 4),
+#         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+#         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+#         ("SPAN", (0, 0), (-1, 0)),  # Title
+#         ("SPAN", (0, 2), (0, 3)),  # KURASTI KALAN SIDE
+#         ("SPAN", (0, 4), (0, 5)),  # KANSPUR GUGAULI SIDE
+#     ]))
+
+#     border_table_width = sum(border_col_widths)
+#     border_table_x = x0 + station_table_width + 20  # 20 units gap
+#     border_table.wrapOn(c, border_table_width, sum(border_row_heights))
+#     border_table.drawOn(c, border_table_x, y0)
+

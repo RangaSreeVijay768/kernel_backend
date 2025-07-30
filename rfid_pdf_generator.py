@@ -4,7 +4,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-from bottom_left_tables import draw_title_block_on_pdf, draw_bottom_right_block_on_pdf, draw_direction_arrows
+from bottom_left_tables import draw_title_block_on_pdf, draw_bottom_right_block_on_pdf, draw_direction_arrows, draw_combined_station_and_border_table
 from PIL import Image
 import os
 
@@ -107,13 +107,19 @@ def generate_pdf_with_rfid_image():
         frame_right = Frame(content_rect['x0'] + 2 * col_width, text_y, col_width, top_text_height, showBoundary=0)
         
         
-        # Draw arrows above left frame
-        draw_direction_arrows(c, x_center=frame_left._x1 + (frame_left._x2 - frame_left._x1) / 2,
-                            y_center=frame_left._y1 + 10)
+        # Arrow above top-left HTML block
+        draw_direction_arrows(
+            c,
+            x_center=frame_left._x1 + (frame_left._x2 - frame_left._x1) / 2,
+            y_center=frame_left._y2 - 10  # Just above the top of left frame
+        )
 
-        # Draw arrows above right frame
-        draw_direction_arrows(c, x_center=frame_right._x1 + (frame_right._x2 - frame_right._x1) / 2,
-                            y_center=frame_right._y1 + 10)
+        # Arrow above top-right HTML block
+        draw_direction_arrows(
+            c,
+            x_center=frame_right._x1 + (frame_right._x2 - frame_right._x1) / 2,
+            y_center=frame_right._y2 - 20  # Just above the top of right frame
+        )
 
 
         # Add HTML content as Paragraphs
@@ -137,6 +143,14 @@ def generate_pdf_with_rfid_image():
             total_height=title_block_height * 0.7
         )
         
+        
+        draw_combined_station_and_border_table(
+            c=c,
+            x0=content_rect['x0'] + ((content_rect['x1'] - content_rect['x0']) - 2000) / 2,
+            y0=title_block_y,
+            width=content_rect['x1'] - content_rect['x0']
+        )
+        
         draw_bottom_right_block_on_pdf(
             c=c,
             x0=content_rect['x1'] - title_block_width,  # right-aligned X
@@ -157,3 +171,5 @@ def generate_pdf_with_rfid_image():
 
     except Exception as e:
         return jsonify({"error": f"PDF generation failed: {str(e)}"}), 500
+
+
