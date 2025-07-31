@@ -1,6 +1,9 @@
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import Table, TableStyle, Paragraph
+import pandas as pd
+import re
+from collections import Counter, defaultdict
 
 
 def draw_title_block_on_pdf(c, x0, y0, width, total_height):
@@ -347,14 +350,14 @@ def draw_direction_arrows(c, x_center, y_center, length=40, spacing=15):
 
 
 
-def draw_combined_station_and_border_table(c, x0, y0, width, height=None):
+def draw_combined_station_and_border_table(c, x0, y0, width, height=None, alloted_tags=None, alloted_tins=None):
     styles = getSampleStyleSheet()
     para_style = ParagraphStyle(
         name='WrapStyle',
         fontName='Helvetica',
         fontSize=8,
         leading=10,
-        alignment=1,  # center
+        alignment=1,
     )
 
     # ----------- STATION DATA ------------
@@ -363,9 +366,9 @@ def draw_combined_station_and_border_table(c, x0, y0, width, height=None):
         ["", "37113", "37112", "37111", "", "37110"],
         ["RFID", "RANGE", "1–50", "941–999", "901–940", "851–900"],
         ["", "ALLOTTED",
-         "1,2,3,4,5,6,7,8,9,16,17,18,19,20,21,22,23,24,25,26,27,28,29,36,37,38,39,40,41",
-         "941,942,943,944,945,946,947,948,949,950,951,952,953,954,955,956,957,958,959,960,961,962,963,964,965,966,967,968,969,970,971,972,973,974,975,976,977,978,979,980,981,982,983,984",
-         "901,902,903,904,905,906,907,908,909,910,911,916,917,918,919,920,921,922,923,924,925,926,928,930",
+         "-----",
+         alloted_tags,
+         "-----",
          "-----"],
         ["", "SPARE",
          "10,11,12,13,14,15,30,31,32,33,34,35,42,43,44,45,46,47,48,49,50",
@@ -374,7 +377,7 @@ def draw_combined_station_and_border_table(c, x0, y0, width, height=None):
          "-----"],
         ["TIN", "RANGE", "236–240", "211–235", "206–210", "197–200"],
         ["", "ALLOTTED", "237(UP) 236(DN)",
-         "211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,227,229",
+         alloted_tins,
          "207(UP) 206(DN)", "-----"],
         ["", "SPARE", "238,239,240",
          "226,228,230,231,232,233,234,235",
@@ -452,77 +455,147 @@ def draw_combined_station_and_border_table(c, x0, y0, width, height=None):
 
 
 
-# def draw_combined_station_and_border_table(c, x0, y0, width, height=None):
-#     # ------------------ LEFT: Station Tag Table ------------------
-#     station_data = [
-#         ["STATION ID", "KKS", "(MWH–RH2–KKS)", "MWH", "(MWH–KSQ)", "KSQ"],
-#         ["", "37113", "37112", "37111", "", "37110"],
-#         ["RFID", "RANGE", "1–50", "941–999", "901–940", "851–900"],
-#         ["", "ALLOTTED", "1,2,3,4,5,6,7,8,9,16,17,18,19\n20,21,22,23,24,25,26,27,28,29\n36,37,38,39,40,41", 
-#          "941,942,943,944,945,946,947,948,949,950,951,952\n953,954,955,956,957,958,959,960,961,962,963,964\n965,966,967,968,969,970,971,972,973,974,975,976\n977,978,979,980,981,982,983,984", 
-#          "901,902,903,904,905,906,907,908,909,910,911\n916,917,918,919,920,921,922,923,924,925\n926,928,930", 
-#          "-----"],
-#         ["", "SPARE", 
-#          "10,11,12,13,14,15,30,31,32,33,34\n35,42,43,44,45,46,47,48,49,50", 
-#          "985\n986,987,988,989,990,991,992,993,994,995\n996,997,998,999", 
-#          "912,913,914,915\n927,929,931,932,933,934,935,936\n937,938,939,940", 
-#          "-----"],
-#         ["TIN", "RANGE", "236–240", "211–235", "206–210", "197–200"],
-#         ["", "ALLOTTED", "237(UP)\n236(DN)", 
-#          "211,212,213,214,215,216,217,218,219,220\n221,222,223,224,225,227,229", 
-#          "207(UP)\n206(DN)", 
-#          "-----"],
-#         ["", "SPARE", "238,239,240", "226,228,230,231,232,233,234,235", "208,209,210", "-----"]
-#     ]
-#     station_col_widths = [100, 90, 130, 200, 200, 90]
-#     station_row_heights = [28, 24, 24, 50, 48, 24, 45, 45]
 
-#     station_table = Table(station_data, colWidths=station_col_widths, rowHeights=station_row_heights)
-#     station_table.setStyle(TableStyle([
-#         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-#         ("FONTNAME", (0, 1), (-1, 1), "Helvetica"),
-#         ("FONTSIZE", (0, 0), (-1, -1), 8),
-#         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-#         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-#         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-#         ("SPAN", (0, 0), (0, 1)),  # STATION ID
-#         ("SPAN", (0, 2), (0, 4)),  # RFID
-#         ("SPAN", (0, 5), (0, 7)),  # TIN
-#     ]))
+def extract_tag_and_tin_ranges(file_path):
+    # Regex to match tag numbers like 947/M, 947/D
+    tag_pattern = re.compile(r"(\d{3,4})[\/_]([MD])", re.IGNORECASE)
+    tin_keywords = ["TIN 1", "TIN 2", "TIN in Nominal Direction", "TIN in Reverse Direction"]
+    station_keywords = ["Station ID in Nominal Direction", "Station ID in Reverse Direction"]
 
-#     station_table_width = sum(station_col_widths)
-#     station_table.wrapOn(c, width, height or sum(station_row_heights))
-#     station_table.drawOn(c, x0, y0)
+    tag_numbers = set()
+    tin_numbers = set()
+    station_id_list = []
+    tag_station_map = defaultdict(dict)  # Format: {947: {"nominal": "37111", "reverse": "37112"}}
 
-#     # ------------------ RIGHT: Border Line Tags Table ------------------
-#     border_data = [
-#         ["BORDER LINE TAGS", "", "", "", ""],
-#         ["", "DIRECTION", "TAG ID", "DISTANCE FROM\nMID POINT (MWH)", "SIG STRENGTH AS PER\nRSSI SURVEY"],
-#         ["KURASTI KALAN SIDE", "UP", "R–03", "3.168KM", "ABOVE –60db"],
-#         ["", "DN", "R–18", "2.779KM", "ABOVE –60db"],
-#         ["KANSPUR GUGAULI SIDE", "UP", "R–903", "3.984KM", "ABOVE –60db"],
-#         ["", "DN", "R–918", "4.586KM", "ABOVE –60db"],
-#     ]
-#     border_col_widths = [150, 150, 150, 150, 150]
-#     border_row_heights = [30, 30, 25, 25, 25, 25]
+    try:
+        xls = pd.ExcelFile(file_path)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return "", "", "", "", ""
 
-#     border_table = Table(border_data, colWidths=border_col_widths, rowHeights=border_row_heights)
-#     border_table.setStyle(TableStyle([
-#         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-#         ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
-#         ("FONTSIZE", (0, 0), (-1, -1), 10),
-#         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-#         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-#         ("TOPPADDING", (0, 0), (-1, -1), 4),
-#         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-#         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-#         ("SPAN", (0, 0), (-1, 0)),  # Title
-#         ("SPAN", (0, 2), (0, 3)),  # KURASTI KALAN SIDE
-#         ("SPAN", (0, 4), (0, 5)),  # KANSPUR GUGAULI SIDE
-#     ]))
+    for sheet in xls.sheet_names:
+        # Read the sheet, try different header rows to find the correct one
+        df = pd.read_excel(xls, sheet_name=sheet, header=None)
+        header_row = None
+        tag_columns = {}
 
-#     border_table_width = sum(border_col_widths)
-#     border_table_x = x0 + station_table_width + 20  # 20 units gap
-#     border_table.wrapOn(c, border_table_width, sum(border_row_heights))
-#     border_table.drawOn(c, border_table_x, y0)
+        # Find the row with tag headers (e.g., 947/M, 947/D)
+        for i in range(min(5, len(df))):  # Check first 5 rows
+            row = df.iloc[i].astype(str)
+            tag_count = 0
+            for col_idx, val in enumerate(row):
+                match = tag_pattern.search(val.strip())
+                if match:
+                    tag_num = int(match.group(1))
+                    tag_columns[col_idx] = tag_num
+                    tag_numbers.add(tag_num)
+                    tag_count += 1
+            if tag_count > 5:  # Assume row is header if multiple tags found
+                header_row = i
+                break
 
+        if header_row is None:
+            df = pd.read_excel(xls, sheet_name=sheet, header=1)
+            for col in df.columns:
+                match = tag_pattern.search(str(col).strip())
+                if match:
+                    tag_num = int(match.group(1))
+                    tag_numbers.add(tag_num)
+                    tag_columns[df.columns.get_loc(col)] = tag_num
+            if not tag_columns:
+                print(f"No tags found in columns for sheet {sheet}")
+                continue
+
+        # Process "NT" sheet for station IDs
+        if sheet.upper() == "NT":
+            nominal_row = None
+            reverse_row = None
+            # Find station ID rows
+            for i in range(len(df)):
+                row = df.iloc[i].astype(str)
+                row_str = " ".join(val.strip().upper() for val in row if pd.notna(val))
+                if "STATION ID IN NOMINAL DIRECTION" in row_str:
+                    if i + 1 < len(df):
+                        nominal_row = df.iloc[i]
+                        # print(f"Nominal station ID row at index {i}: {nominal_row.values}")
+                if "STATION ID IN REVERSE DIRECTION" in row_str:
+                    if i + 1 < len(df):
+                        reverse_row = df.iloc[i]
+                        # print(f"Reverse station ID row at index {i}: {reverse_row.values}")
+
+            # Map tags to station IDs
+            if nominal_row is not None and reverse_row is not None:
+                for col_idx, tag_num in tag_columns.items():
+                    try:
+                        nominal_id = str(int(float(nominal_row.iloc[col_idx])))
+                        reverse_id = str(int(float(reverse_row.iloc[col_idx])))
+                        tag_station_map[tag_num]['nominal'] = nominal_id
+                        tag_station_map[tag_num]['reverse'] = reverse_id
+                        station_id_list.extend([nominal_id, reverse_id])
+                    except (ValueError, TypeError) as e:
+                        print(f"Error processing tag {tag_num} at column {col_idx}: {e}")
+                        continue
+            else:
+                print("Nominal or Reverse station ID row not found in NT sheet")
+
+        # Extract TIN numbers
+        for i in range(len(df)):
+            row = df.iloc[i].astype(str)
+            row_str = " ".join(val.strip().upper() for val in row if pd.notna(val))
+            if any(keyword.upper() in row_str for keyword in tin_keywords):
+                for val in row:
+                    try:
+                        num = int(float(val))
+                        if num >= 100:
+                            tin_numbers.add(num)
+                    except (ValueError, TypeError):
+                        continue
+
+        # Generic Station ID capture
+        for i in range(len(df)):
+            row = df.iloc[i].astype(str)
+            row_str = " ".join(val.strip().upper() for val in row if pd.notna(val))
+            if "STATION ID" in row_str:
+                for val in row:
+                    val_str = str(val).strip()
+                    if val_str.isdigit() and len(val_str) >= 4:
+                        station_id_list.append(val_str)
+
+    def group_into_ranges(numbers):
+        sorted_nums = sorted(numbers)
+        if not sorted_nums:
+            return ""
+        ranges = []
+        start = end = sorted_nums[0]
+        for num in sorted_nums[1:]:
+            if num == end + 1:
+                end = num
+            else:
+                ranges.append((start, end))
+                start = end = num
+        ranges.append((start, end))
+        return ", ".join(f"{s}-{e}" if s != e else f"{s}" for s, e in ranges)
+
+    tag_ranges = group_into_ranges(tag_numbers)
+    tin_ranges = group_into_ranges(tin_numbers)
+    unique_station_ids = sorted(set(station_id_list))
+    station_id_string = ", ".join(unique_station_ids)
+    most_common_station_id = Counter(station_id_list).most_common(1)[0][0] if station_id_list else ""
+
+    # Tags with different Nominal and Reverse station IDs
+    diff_station_tags = []
+    for tag_num, dirs in tag_station_map.items():
+        if 'nominal' in dirs and 'reverse' in dirs and dirs['nominal'] != dirs['reverse']:
+            diff_station_tags.append(tag_num)
+    border_tags = ", ".join(str(t) for t in sorted(diff_station_tags))
+
+    return tag_ranges, tin_ranges, station_id_string, most_common_station_id, border_tags
+
+# Example usage
+# tag_str, tin_str, station_str, common_station, diff_tags = extract_tag_and_tin_ranges("D:\jay-robotix\Design Document Automation\Output_Documents\Malwan\tables\TD_Malwan_station.xlsx")
+
+# print("TAGs:", tag_str)
+# print("TINs:", tin_str)
+# print("Stations:", station_str)
+# print("Most Common Station:", common_station)
+# print("Tags with Different Nominal/Reverse Station IDs:", diff_tags)

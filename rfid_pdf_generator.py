@@ -4,9 +4,11 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-from bottom_left_tables import draw_title_block_on_pdf, draw_bottom_right_block_on_pdf, draw_direction_arrows, draw_combined_station_and_border_table
+from bottom_left_tables import draw_title_block_on_pdf, draw_bottom_right_block_on_pdf, draw_direction_arrows, draw_combined_station_and_border_table, extract_tag_and_tin_ranges
 from PIL import Image
 import os
+
+
 
 def generate_pdf_with_rfid_image():
     try:
@@ -15,6 +17,7 @@ def generate_pdf_with_rfid_image():
         top_left_html = request.form.get('top_left_html', '')
         top_center_html = request.form.get('top_center_html', '')
         top_right_html = request.form.get('top_right_html', '')
+        excel_path = request.form.get('excel_path')
 
         if not image_path or not output_path:
             return jsonify({"error": "Missing image path or output path"}), 400
@@ -134,6 +137,8 @@ def generate_pdf_with_rfid_image():
         # Draw image first (above title block)
         c.drawImage(ImageReader(image_path), content_rect['x0'], image_y, width=img_width, height=img_height)
 
+        alloted_tags, alloted_tins, station_str, common_station, border_tags = extract_tag_and_tin_ranges(excel_path)
+        
         # Draw title block at bottom
         draw_title_block_on_pdf(
             c,
@@ -148,7 +153,9 @@ def generate_pdf_with_rfid_image():
             c=c,
             x0=content_rect['x0'] + ((content_rect['x1'] - content_rect['x0']) - 2000) / 2,
             y0=title_block_y,
-            width=content_rect['x1'] - content_rect['x0']
+            width=content_rect['x1'] - content_rect['x0'],
+            alloted_tags=alloted_tags,
+            alloted_tins=alloted_tins
         )
         
         draw_bottom_right_block_on_pdf(
@@ -158,6 +165,7 @@ def generate_pdf_with_rfid_image():
             width=title_block_width,
             height=title_block_height * 0.7
         )
+        
 
         c.showPage()
         c.save()
