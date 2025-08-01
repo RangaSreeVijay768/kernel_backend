@@ -349,8 +349,66 @@ def draw_direction_arrows(c, x_center, y_center, length=40, spacing=15):
 
 
 
+def get_all_station_data(excel_path):
+    df = pd.read_excel(excel_path, sheet_name="RFID TAG & TIN Ranges")
+    df.columns = [str(col).strip().upper() for col in df.columns]
 
-def draw_combined_station_and_border_table(c, x0, y0, width, height=None, alloted_tags=None, alloted_tins=None):
+    required_cols = ["STATION CODE", "STATION ID", "RFID TAG RANGE", "RFID TIN RANGE"]
+    for col in required_cols:
+        if col not in df.columns:
+            raise ValueError(f"Missing column: {col}")
+
+    return df[required_cols].dropna().to_dict(orient="records")
+
+def calculate_spare_range(actual_range, allotted_range):
+    def parse_range(r):
+        if not r:
+            return set()
+        parts = r.split(",")
+        numbers = set()
+        for part in parts:
+            part = part.strip()
+            if "-" in part:
+                try:
+                    start, end = map(int, part.split("-"))
+                    numbers.update(range(start, end + 1))
+                except:
+                    continue  # ignore malformed range
+            else:
+                try:
+                    numbers.add(int(part))
+                except:
+                    continue  # ignore malformed single value
+        return numbers
+
+
+    actual_set = parse_range(actual_range)
+    allotted_set = parse_range(allotted_range)
+    spare_set = sorted(actual_set - allotted_set)
+
+    if not spare_set:
+        return "-----"
+
+    # Convert back to compressed range string
+    ranges = []
+    start = prev = spare_set[0]
+    for num in spare_set[1:]:
+        if num == prev + 1:
+            prev = num
+        else:
+            ranges.append(f"{start}-{prev}" if start != prev else str(start))
+            start = prev = num
+    ranges.append(f"{start}-{prev}" if start != prev else str(start))
+
+    return ", ".join(ranges)
+
+
+def draw_combined_station_and_border_table(
+    c, x0, y0, width, height=None,
+    alloted_tags=None, alloted_tins=None,
+    station_id=None, border_tags=None,
+    station_info_path=None
+):
     styles = getSampleStyleSheet()
     para_style = ParagraphStyle(
         name='WrapStyle',
@@ -360,49 +418,71 @@ def draw_combined_station_and_border_table(c, x0, y0, width, height=None, allote
         alignment=1,
     )
 
-    # ----------- STATION DATA ------------
+    station_data_list = get_all_station_data(station_info_path)
+
+    # First two columns: labels
+    headers = ["STATION", "CODE"] + [f'{station["STATION CODE"]}' for station in station_data_list]
+    station_ids = ["", "ID"] + [str(station["STATION ID"]).split(".")[0] for station in station_data_list]
+    rfid_range_row = ["RFID", "RANGE"] + [station["RFID TAG RANGE"] for station in station_data_list]
+    tin_range_row = ["TIN", "RANGE"] + [station["RFID TIN RANGE"] for station in station_data_list]
+    rfid_allotted_row = ["", "ALLOTTED"]
+    tin_allotted_row = ["", "ALLOTTED"]
+
+    for station in station_data_list:
+        sid = str(station["STATION ID"]).split(".")[0]
+        if station_id and str(station_id) == sid:
+            rfid_allotted_row.append(alloted_tags)
+            tin_allotted_row.append(alloted_tins)
+        else:
+            rfid_allotted_row.append("-----")
+            tin_allotted_row.append("-----")
+            
+    rfid_spare_row = ["", "SPARE"]
+    tin_spare_row = ["", "SPARE"]
+
+    for station in station_data_list:
+        sid = str(station["STATION ID"]).split(".")[0]
+        if station_id and str(station_id) == sid:
+            rfid_spare = calculate_spare_range(station["RFID TAG RANGE"], alloted_tags)
+            tin_spare = calculate_spare_range(station["RFID TIN RANGE"], alloted_tins)
+            rfid_spare_row.append(rfid_spare)
+            tin_spare_row.append(tin_spare)
+        else:
+            rfid_spare_row.append("-----")
+            tin_spare_row.append("-----")
+
+
+
     station_raw_data = [
-        ["STATION ID", "KKS", "(MWH–RH2–KKS)", "MWH", "(MWH–KSQ)", "KSQ"],
-        ["", "37113", "37112", "37111", "", "37110"],
-        ["RFID", "RANGE", "1–50", "941–999", "901–940", "851–900"],
-        ["", "ALLOTTED",
-         "-----",
-         alloted_tags,
-         "-----",
-         "-----"],
-        ["", "SPARE",
-         "10,11,12,13,14,15,30,31,32,33,34,35,42,43,44,45,46,47,48,49,50",
-         "985,986,987,988,989,990,991,992,993,994,995,996,997,998,999",
-         "912,913,914,915,927,929,931,932,933,934,935,936,937,938,939,940",
-         "-----"],
-        ["TIN", "RANGE", "236–240", "211–235", "206–210", "197–200"],
-        ["", "ALLOTTED", "237(UP) 236(DN)",
-         alloted_tins,
-         "207(UP) 206(DN)", "-----"],
-        ["", "SPARE", "238,239,240",
-         "226,228,230,231,232,233,234,235",
-         "208,209,210", "-----"]
+        headers,
+        station_ids,
+        rfid_range_row,
+        rfid_allotted_row,
+        rfid_spare_row,
+        tin_range_row,
+        tin_allotted_row,
+        tin_spare_row
     ]
 
-    station_col_widths = [100, 90, 130, 200, 200, 90]
-    station_data = []
-    station_row_heights = []
+    station_col_widths = [80, 80] + [150] * len(station_data_list)
+
+    wrapped_data = []
+    row_heights = []
 
     for row in station_raw_data:
         wrapped_row = []
         row_height = 0
         for i, cell in enumerate(row):
-            para = Paragraph(cell.replace(",", ","), para_style)
+            para = Paragraph(str(cell), para_style)
             wrapped_row.append(para)
-            # Measure required height for cell content
             avail_width = station_col_widths[i]
-            _, cell_height = para.wrap(avail_width, 10000)  # High max height
+            _, cell_height = para.wrap(avail_width, 10000)
             row_height = max(row_height, cell_height)
-        station_data.append(wrapped_row)
-        station_row_heights.append(row_height + 10)  # Padding to avoid clipping
+        wrapped_data.append(wrapped_row)
+        row_heights.append(row_height + 15)
 
-    station_table = Table(station_data, colWidths=station_col_widths, rowHeights=station_row_heights)
-    station_table.setStyle(TableStyle([
+    table = Table(wrapped_data, colWidths=station_col_widths, rowHeights=row_heights)
+    table.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTNAME", (0, 1), (-1, 1), "Helvetica"),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
@@ -417,43 +497,45 @@ def draw_combined_station_and_border_table(c, x0, y0, width, height=None, allote
     ]))
 
     station_table_width = sum(station_col_widths)
-    station_table.wrapOn(c, width, height or sum(station_row_heights))
-    station_table.drawOn(c, x0, y0)
+    table.wrapOn(c, width, height or sum(row_heights))
+    table.drawOn(c, x0, y0)
     
     
-        # ------------------ RIGHT: Border Line Tags Table ------------------
+    # ------------------ RIGHT: Border Line Tags Table ------------------
     border_data = [
         ["BORDER LINE TAGS", "", "", "", ""],
         ["", "DIRECTION", "TAG ID", "DISTANCE FROM\nMID POINT (MWH)", "SIG STRENGTH AS PER\nRSSI SURVEY"],
-        ["KURASTI KALAN SIDE", "UP", "R–03", "3.168KM", "ABOVE –60db"],
-        ["", "DN", "R–18", "2.779KM", "ABOVE –60db"],
-        ["KANSPUR GUGAULI SIDE", "UP", "R–903", "3.984KM", "ABOVE –60db"],
-        ["", "DN", "R–918", "4.586KM", "ABOVE –60db"],
+        ["KURASTI KALAN SIDE", "UP", f"R-{border_tags[0]}", "3.168KM", "ABOVE –60db"],
+        ["", "DN", f"R-{border_tags[1]}", "2.779KM", "ABOVE –60db"],
+        ["KANSPUR GUGAULI SIDE", "UP", f"R-{border_tags[2]}", "3.984KM", "ABOVE –60db"],
+        ["", "DN", f"R-{border_tags[3]}", "4.586KM", "ABOVE –60db"],
     ]
     border_col_widths = [150, 150, 150, 150, 150]
-    border_row_heights = [40, 40, 35, 35, 35, 35]
+    border_row_heights = [36, 36, 32, 32, 32, 32]
 
     border_table = Table(border_data, colWidths=border_col_widths, rowHeights=border_row_heights)
     border_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica"),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica"),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
-        ("SPAN", (0, 0), (-1, 0)),  # Title
-        ("SPAN", (0, 2), (0, 3)),  # KURASTI KALAN SIDE
-        ("SPAN", (0, 4), (0, 5)),  # KANSPUR GUGAULI SIDE
+        ("SPAN", (0, 0), (-1, 0)),
+        ("SPAN", (0, 2), (0, 3)),
+        ("SPAN", (0, 4), (0, 5)),
     ]))
 
     border_table_width = sum(border_col_widths)
-    border_table_x = x0 + station_table_width + 20  # 20 units gap
+    border_table_x = x0 + station_table_width + 20
     border_table.wrapOn(c, border_table_width, sum(border_row_heights))
     border_table.drawOn(c, border_table_x, y0)
 
 
+    
+    
 
 
 def extract_tag_and_tin_ranges(file_path):
@@ -576,26 +658,47 @@ def extract_tag_and_tin_ranges(file_path):
         ranges.append((start, end))
         return ", ".join(f"{s}-{e}" if s != e else f"{s}" for s, e in ranges)
 
-    tag_ranges = group_into_ranges(tag_numbers)
-    tin_ranges = group_into_ranges(tin_numbers)
+    alloted_tags = group_into_ranges(tag_numbers)
+    alloted_tins = group_into_ranges(tin_numbers)
     unique_station_ids = sorted(set(station_id_list))
-    station_id_string = ", ".join(unique_station_ids)
-    most_common_station_id = Counter(station_id_list).most_common(1)[0][0] if station_id_list else ""
+    station_ids = ", ".join(unique_station_ids)
+    most_station_id = Counter(station_id_list).most_common(1)[0][0] if station_id_list else ""
 
     # Tags with different Nominal and Reverse station IDs
     diff_station_tags = []
     for tag_num, dirs in tag_station_map.items():
         if 'nominal' in dirs and 'reverse' in dirs and dirs['nominal'] != dirs['reverse']:
             diff_station_tags.append(tag_num)
-    border_tags = ", ".join(str(t) for t in sorted(diff_station_tags))
+    border_tags = diff_station_tags
 
-    return tag_ranges, tin_ranges, station_id_string, most_common_station_id, border_tags
+    return alloted_tags, alloted_tins, station_ids, most_station_id, border_tags
 
 # Example usage
-# tag_str, tin_str, station_str, common_station, diff_tags = extract_tag_and_tin_ranges("D:\jay-robotix\Design Document Automation\Output_Documents\Malwan\tables\TD_Malwan_station.xlsx")
+# tag_str, tin_str, station_str, common_station, diff_tags = extract_tag_and_tin_ranges("D:/jay-robotix/Design Document Automation/Output_Documents/Malwan/tables/TD_Malwan_station.xlsx")
 
 # print("TAGs:", tag_str)
 # print("TINs:", tin_str)
 # print("Stations:", station_str)
 # print("Most Common Station:", common_station)
 # print("Tags with Different Nominal/Reverse Station IDs:", diff_tags)
+
+
+
+
+def get_station_data_by_id(excel_path, station_id):
+    df = pd.read_excel(excel_path, sheet_name="Sheet1", header=1)
+    df.columns = [str(col).strip().upper() for col in df.columns]
+    station_id_col = next((col for col in df.columns if "STATION" in col and "ID" in col), None)
+    if not station_id_col:
+        raise ValueError("No column found containing 'Station ID'")
+    matched_rows = df[df[station_id_col] == station_id]
+    return matched_rows.to_dict(orient="records")
+
+
+
+# excel_file = "Footer_data.xlsx"
+# station_id = 37111
+# station_data = get_station_data_by_id(excel_file, station_id)
+
+# for row in station_data:
+#     print(row)

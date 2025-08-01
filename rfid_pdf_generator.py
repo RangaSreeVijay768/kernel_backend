@@ -17,7 +17,8 @@ def generate_pdf_with_rfid_image():
         top_left_html = request.form.get('top_left_html', '')
         top_center_html = request.form.get('top_center_html', '')
         top_right_html = request.form.get('top_right_html', '')
-        excel_path = request.form.get('excel_path')
+        tag_data_path = request.form.get('tag_data_path')
+        station_info_path = request.form.get('station_info_path')
 
         if not image_path or not output_path:
             return jsonify({"error": "Missing image path or output path"}), 400
@@ -137,7 +138,7 @@ def generate_pdf_with_rfid_image():
         # Draw image first (above title block)
         c.drawImage(ImageReader(image_path), content_rect['x0'], image_y, width=img_width, height=img_height)
 
-        alloted_tags, alloted_tins, station_str, common_station, border_tags = extract_tag_and_tin_ranges(excel_path)
+        alloted_tags, alloted_tins, station_ids, most_station_id, border_tags = extract_tag_and_tin_ranges(tag_data_path)
         
         # Draw title block at bottom
         draw_title_block_on_pdf(
@@ -155,7 +156,10 @@ def generate_pdf_with_rfid_image():
             y0=title_block_y,
             width=content_rect['x1'] - content_rect['x0'],
             alloted_tags=alloted_tags,
-            alloted_tins=alloted_tins
+            alloted_tins=alloted_tins,
+            station_id=most_station_id,
+            border_tags=border_tags,
+            station_info_path=station_info_path
         )
         
         draw_bottom_right_block_on_pdf(

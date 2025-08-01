@@ -87,6 +87,8 @@ def format_pdf_table(df, tag_title, sheet_name):
     # Load footer template
     if 'footer_template' not in locals():
         footer_template = extract_template_with_placeholders("template.xlsx", "A2:O6")
+    
+    
 
     for i in range(total_chunks):
         footer_values = {

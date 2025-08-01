@@ -2,6 +2,10 @@ from flask import Flask, request, jsonify
 import os
 import shutil
 from flask_cors import CORS
+import os
+from flask import request, jsonify
+from werkzeug.utils import secure_filename
+import shutil
 
 
 def get_stations():
@@ -16,7 +20,59 @@ def get_stations():
         return jsonify({'stations': folders})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 
+def get_station_details():
+    base_path = request.args.get('path')
+
+    if not base_path or not os.path.isdir(base_path):
+        return jsonify({'error': 'Invalid or missing path'}), 400
+
+    try:
+        result = []
+        for root, dirs, files in os.walk(base_path):
+            for name in dirs:
+                result.append(os.path.join(root, name))
+            for name in files:
+                result.append(os.path.join(root, name))
+
+        return jsonify({'contents': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+
+def open_file():
+    data = request.get_json()
+    file_path = data.get("file_path")
+
+    if not os.path.isfile(file_path):
+        return jsonify({"success": False, "message": "File not found"}), 404
+
+    try:
+        # For Windows (use startfile or subprocess)
+        os.startfile(file_path)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# ✅ BACKEND: upload_input_file
+def upload_input_file():
+    file = request.files.get('file')
+    station = request.form.get('station')
+    base_path = request.form.get('base_path')
+
+    if not file or not station or not base_path:
+        return jsonify({"success": False, "message": "Missing data"}), 400
+
+    try:    
+        filename = secure_filename(file.filename)
+        target_dir = os.path.join(base_path, "Output_Documents", station, "inputs")
+        os.makedirs(target_dir, exist_ok=True)
+        file.save(os.path.join(target_dir, filename))
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 def copy_to_inputs_folder():
