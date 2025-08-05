@@ -2,11 +2,12 @@ from flask import Flask, request, jsonify
 import os
 import shutil
 from flask_cors import CORS
-from station_controllers import get_stations, get_station_details, copy_to_inputs_folder, copy_files_to_output, open_file, upload_input_file
-from file_checker import check_documents
-from file_converter import process_excel
-from pdf_converter import process_pdf
-from rfid_pdf_generator import generate_pdf_with_rfid_image
+from controllers.station_controllers import get_stations, get_station_details, copy_to_inputs_folder, copy_files_to_output, open_file, upload_input_file
+from components.file_checker import check_documents
+from file_generators.tag_data_excel_formatted_generator import process_excel
+from file_generators.tag_data_pdf_generator import process_pdf
+from file_generators.rfid_pdf_generator import generate_pdf_with_rfid_image
+from file_generators.toc_pdf_generator import generate_toc_pdf_with_header_footer
 
 app = Flask(__name__)
 CORS(app)
@@ -53,6 +54,10 @@ def generate_pdf_route():
 @app.route('/api/generate-rfid-pdf', methods=['POST'])
 def generate_rdid_pdf_route():
     return generate_pdf_with_rfid_image()
+
+@app.route('/api/generate-toc-pdf', methods=['POST'])
+def generate_toc_pdf():
+    return generate_toc_pdf_with_header_footer()
 
 
 if __name__ == '__main__':

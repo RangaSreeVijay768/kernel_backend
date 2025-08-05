@@ -2,13 +2,20 @@ from flask import Flask, request, send_file, jsonify
 import pandas as pd
 import re
 import os
-from openpyxl import Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-from calculations_nt import generate_pages_for_tag as calculate_values_nt, TagInfo as TagInfoNT, TagDir as TagDirNT
-from calculations_aline import calculate_values as calculate_values_aline, TagInfo as TagInfoAline, TagDir as TagDirAline
-from calculations_adj import generate_pages_for_tag as calculate_values_adj, TagInfo as TagInfoAdj, TagDir as TagDirAdj
+import textwrap
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A3
+from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from calculations.calculations_nt import generate_pages_for_tag as calculate_values_nt, TagInfo as TagInfoNT, TagDir as TagDirNT
+from calculations.calculations_aline import calculate_values as calculate_values_aline, TagInfo as TagInfoAline, TagDir as TagDirAline
+from calculations.calculations_adj import generate_pages_for_tag as calculate_values_adj, TagInfo as TagInfoAdj, TagDir as TagDirAdj
+from datetime import datetime
+
+
+current_date = datetime.now().strftime("%d.%m.%Y")
 
 app = Flask(__name__)
 
@@ -23,113 +30,262 @@ def extract_tag_columns(columns):
     return tag_cols
 
 def get_style_elements():
-    thin = Side(border_style="thin", color="000000")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
-    font = Font(name="Times New Roman", size=11)
-    bold_font = Font(name="Times New Roman", size=11, bold=True)
-    align = Alignment(horizontal="center", vertical="center", wrap_text=True, indent=1)
-    return border, fill, font, bold_font, align
+    thin = colors.black
+    fill = colors.HexColor("#D9D9D9")
+    font_name = "Times-Roman"
+    font_size = 8
+    bold_font = "Times-Bold"
+    return thin, fill, font_name, font_size, bold_font
 
-def format_sheet(ws, df, tag_title):
+
+def format_pdf_table(df, tag_title, sheet_name):
     from math import ceil
+    try:
+        from components.tag_data_footer import extract_template_with_placeholders
+        from openpyxl.utils import range_boundaries
+    except ImportError:
+        print("Warning: Footer module not found. Footer insertion will be skipped.")
+        footer_template = {"template": [], "merged_cells": [], "start_row": 1, "start_col": 1}
 
-    border, fill, font, bold_font, align = get_style_elements()
+    thin, fill, font_name, font_size, bold_font = get_style_elements()
+    styles = getSampleStyleSheet()
+    header_style = ParagraphStyle(
+        name='HeaderStyle',
+        fontName='Times-Bold',
+        fontSize=14,
+        alignment=1,  # TA_CENTER
+        spaceAfter=6,
+        leading=16
+    )
+    footer_style = ParagraphStyle(
+        name='FooterStyle',
+        fontName='Times-Roman',  # Match Excel's default font
+        fontSize=11,  # Default size, will be overridden for specific fields
+        alignment=1,  # Center-aligned
+        leading=12,
+        spaceBefore=2,
+        spaceAfter=2
+    )
+
     predefined_cols = ["FIELD NAME / DESCRIPTION", "BIT POSITION", "Size (Bits)"]
     tag_columns = [col for col in df.columns if col not in predefined_cols]
     chunk_size = 10
     total_chunks = ceil(len(tag_columns) / chunk_size)
-    current_row = 1
+    elements = []
 
-    try:
-        from footer import extract_template_with_placeholders, insert_footer_into_worksheet
-        footer_template = extract_template_with_placeholders("template.xlsx", "A2:O6")
-    except ImportError:
-        footer_template = {"template": []}
-        print("Warning: Footer module not found. Footer insertion will be skipped.")
+    page_width = 397 * mm
+    page_height = 210 * mm
+    margin = 10 * mm
+    table_width = page_width - 2 * margin
+
+    # Adjusted column widths to fit within page (total ~277mm), matching sample PDF
+    col_widths = [80 * mm, 35 * mm, 30 * mm] + [27 * mm] * 10  # Up to 10 tag columns
+    total_width = sum(col_widths[:13])  # Max 13 columns (3 predefined + 10 tags)
+    if total_width > table_width:
+        scale = table_width / total_width
+        col_widths = [w * scale for w in col_widths]
+
+    # Footer column widths (15 columns to match Excel A:O)
+    footer_col_widths = [table_width / 15] * 15  # Equal widths for simplicity, adjust if needed
+
+    # Load footer template
+    if 'footer_template' not in locals():
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        files_dir = os.path.join(base_dir, "files")
+        template_path = os.path.join(files_dir, "template.xlsx")
+
+        footer_template = extract_template_with_placeholders(template_path, "A2:O6")
+    
+    
 
     for i in range(total_chunks):
         footer_values = {
-            "division": {"value": "PRAYAGRAJ Division", "size": 22},
-            "railways": {"value": "NC RAILWAYS", "size": 22},
-            "station-name": {"value": "MALWAN(MWH)", "size": 22},
-            "station-id": {"value": "Section Id: 37111", "size": 22},
-            "date": {"value": "25-07-2025", "size": 22},
-            "total-pages": {"value": str(total_chunks), "size": 22},
-            "current-page": {"value": str(i + 1), "size": 22}
+            "division": {"value": "PRAYAGRAJ Division\n", "size": 16},
+            "railways": {"value": "NC RAILWAYS\n", "size": 16},
+            "station-name": {"value": "MALWAN(MWH)\n", "size": 16},
+            "station-id": {"value": "Section Id: 37111\n", "size": 16},
+            "date": {"value": current_date, "size": 8},
+            "total-pages": {"value": str(total_chunks), "size": 8},
+            "current-page": {"value": str(i + 1), "size": 8}
         }
         start = i * chunk_size
         end = start + chunk_size
         tag_chunk = tag_columns[start:end]
         temp_df = df[predefined_cols + tag_chunk]
 
-        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=15)
-        header_cell = ws.cell(row=current_row, column=1, value=tag_title)
-        header_cell.font = Font(name='Times New Roman', size=14, bold=True)
-        header_cell.alignment = Alignment(horizontal='center', vertical='center')
-        header_cell.border = border
-        ws.row_dimensions[current_row].height = 25
-        current_row += 1
+        # Header
+        header_text = f"{tag_title}"
+        header = Paragraph(header_text, header_style)
+        elements.append(header)
+        elements.append(Spacer(1, 4 * mm))
 
-        for r_idx, row in enumerate(dataframe_to_rows(temp_df, index=False, header=True), start=current_row):
-            for c_idx, value in enumerate(row, start=1):
-                actual_col = c_idx + 2 if c_idx > 1 else c_idx
-                if c_idx == 1:
-                    ws.merge_cells(start_row=r_idx, start_column=1, end_row=r_idx, end_column=3)
-                    ws.cell(row=r_idx, column=1, value=value)
-                    for col in range(1, 4):
-                        ws.cell(row=r_idx, column=col).border = border
-                else:
-                    ws.cell(row=r_idx, column=actual_col, value=value)
+        # Prepare table data
+        def wrap_text(text, max_chars):
+            if pd.isna(text):
+                return ''
+            text = str(text)
+            wrapped_lines = textwrap.wrap(text, width=max_chars)
+            return '\n'.join(wrapped_lines)
 
-                cell = ws.cell(row=r_idx, column=actual_col if c_idx > 1 else 1)
-                is_header = r_idx == current_row
-                is_predefined = c_idx <= 3
-                cell.font = bold_font if (is_predefined and not is_header) else (bold_font if is_header else font)
-                cell.alignment = align
-                cell.border = border
-                if is_header and c_idx <= 3:
-                    cell.fill = fill
+        # Header row
+        data = [temp_df.columns.tolist()]
 
-        for col_letter in ['A', 'B', 'C']:
-            ws.column_dimensions[col_letter].width = 20
-        ws.column_dimensions['D'].width = 35
-        ws.column_dimensions['E'].width = 35
+        # Data rows
+        for _, row in temp_df.iterrows():
+            wrapped_row = []
+            for idx, (col, cell) in enumerate(zip(temp_df.columns, row)):
+                text = str(cell) if pd.notnull(cell) else ''
+                if idx == 0:  # First column only
+                    text = wrap_text(text, 50)
+                wrapped_row.append(text)
+            data.append(wrapped_row)
 
-        num_tag_cols = 10
-        min_width = 20
-        for col_offset in range(num_tag_cols):
-            col = 6 + col_offset
-            col_letter = get_column_letter(col)
-            max_length = 0
-            if col_offset < len(temp_df.columns) - 3:
-                for row_offset in range(temp_df.shape[0] + 1):
-                    cell = ws.cell(row=current_row + row_offset, column=col)
-                    if cell.value:
-                        max_length = max(max_length, len(str(cell.value)))
-            width = max(min_width, min(max_length + 4, 40))
-            ws.column_dimensions[col_letter].width = width
+        # Create table
+        table = Table(data, colWidths=col_widths[:len(temp_df.columns)], hAlign='LEFT')
+        table_style = TableStyle([
+            ('FONT', (0, 0), (-1, 0), bold_font, font_size),  # Header font
+            ('FONT', (0, 1), (2, -1), bold_font, font_size),  # Predefined columns bold
+            ('FONT', (3, 1), (-1, -1), font_name, font_size),  # Other cells normal
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),  # All centered (adjusted to match Excel)
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('LEFTPADDING', (0, 1), (0, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, thin),
+            ('BOX', (0, 0), (-1, -1), 0.25, thin),
+            ('BACKGROUND', (0, 0), (2, 0), fill),  # Header fill for predefined columns
+            # ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ])
+        table.setStyle(table_style)
 
-        for row_offset in range(temp_df.shape[0] + 1):
-            r = current_row + row_offset
+        # Adjust row heights based on content
+# Adjust row heights based on the tallest cell in the row
+        for row_idx, row in enumerate(data):
             max_lines = 1
-            for col in range(1, 4 + len(temp_df.columns) - 1):
-                cell = ws.cell(row=r, column=col)
-                if cell.value:
-                    text = str(cell.value)
-                    line_breaks = text.count('\n')
-                    wrapped_lines = len(text) // 40 + 1
-                    total_lines = max(line_breaks + 1, wrapped_lines)
-                    max_lines = max(max_lines, total_lines)
-            ws.row_dimensions[r].height = max_lines * 15 + 20 if max_lines > 2 else 40
+            for cell in row:
+                if isinstance(cell, str):
+                    line_count = cell.count('\n') + 1
+                    max_lines = max(max_lines, line_count)
+            # Assume 3.5 mm per line (font_size 8 + padding)
+            table._argH[row_idx] = max(9, max_lines * 3.5) * mm
 
-        current_row += temp_df.shape[0] + 4
-        try:
-            insert_footer_into_worksheet(ws, footer_template, footer_values, current_row)
-        except NameError:
-            print(f"Footer skipped for chunk {i+1} in sheet with title: {tag_title}")
-        current_row += len(footer_template["template"]) + 6
+        elements.append(table)
+        elements.append(Spacer(1, 6 * mm))
 
+        # Prepare footer data
+        if footer_template["template"]:
+            footer_data = []
+            for row in footer_template["template"]:
+                footer_row = []
+                for cell_data in row:
+                    value = cell_data["value"]
+                    font_size = 8  # Default
+                    # Replace placeholders
+                    for key, val in footer_values.items():
+                        placeholder = f"{{{{{key}}}}}"
+                        if placeholder in value:
+                            if isinstance(val, dict):
+                                replacement = str(val.get("value", "")).replace("\n", "<br/>")
+                                font_size = val.get("size", 8)
+                            else:
+                                replacement = str(val).replace("\n", "<br/>")
+                            value = value.replace(placeholder, replacement)
+                    # Wrap text if necessary
+                    wrapped_value = wrap_text(value, 30)  # Adjust based on column width
+                    # Use Paragraph to apply dynamic font size
+                    para = Paragraph(wrapped_value, ParagraphStyle(
+                        name=f'FooterCell_{id(wrapped_value)}',
+                        fontName='Times-Bold',
+                        fontSize=font_size,
+                        alignment=1,  # Center
+                        leading=font_size + 2
+                    ))
+                    footer_row.append(para)
+                footer_data.append(footer_row)
+
+            # Create footer table
+            footer_table = Table(footer_data, colWidths=footer_col_widths, hAlign='LEFT')
+            footer_style = TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('INNERGRID', (0, 0), (-1, -1), 0.25, thin),
+                ('BOX', (0, 0), (-1, -1), 0.25, thin),
+                ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 1),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+            ])
+
+            # Apply merged cells
+            for merge in footer_template["merged_cells"]:
+                min_col, min_row, max_col, max_row = range_boundaries(merge)
+                footer_style.add('SPAN', (min_col - footer_template["start_col"], min_row - footer_template["start_row"]),
+                                (max_col - footer_template["start_col"], max_row - footer_template["start_row"]))
+
+            # Set row heights (50 points in Excel ≈ 17.64 mm)
+            for row_idx in range(len(footer_data)):
+                footer_table._argH[row_idx] = 12.64 * mm
+
+            footer_table.setStyle(footer_style)
+            elements.append(Spacer(1, 3 * mm))
+            elements.append(footer_table)
+            elements.append(PageBreak())
+
+    return elements
+
+
+def get_index_table():
+    # Table content as plain strings
+    elements = []
+
+    # Heading
+    heading_table = Table([["MALWAN"]], colWidths=[500])
+    heading_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 16),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 100),
+    ]))
+    elements.append(heading_table)
+    elements.append(Spacer(1, 10))
+
+    table_data = [
+        ["SIGNAL & TELECOMMUNICATION", ""],
+        ["TRAIN COLLISION AVOIDANCE SYSTEM (TCAS) - KAVACH", ""],
+        ["RFID TAG DATA (TAG-DATA)", ""],
+        ["Railway Drawing No.", "SI-3067/1"],
+        ["Zone", "NCR"],
+        ["Division", "Prayagraj"],
+        ["Section", "-"],
+        ["Station Name", "Malwan"],
+        ["Station Code", "MWH"],
+        ["Station ID", "37111"],
+        ["Ref SIP No.", "SI-3067/1"],
+        ["Ref Control Table No. Ref", "2.0.0"],
+        ["RFID Tag Layout No.", "RFID_TAG_LAYOUT_MWH_2.0.0"],
+    ]
+
+    table = Table(table_data, colWidths=[250, 350], rowHeights=[40]*13)
+    table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, 2), 'Helvetica-Bold'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('BACKGROUND', (0, 0), (-1, 2), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 3), (-1, -1), 6),
+        ('FONTSIZE', (0, 0), (-1, -1), 10.5),
+        ('SPAN', (0, 0), (1, 0)),
+        ('SPAN', (0, 1), (1, 1)),
+        ('SPAN', (0, 2), (1, 2)),
+    ]))
+
+    elements.append(table)
+    return elements
 
 
 def process_input_sheet(sheet_name, df):
@@ -282,11 +438,9 @@ def process_input_sheet(sheet_name, df):
                         trimmed = trimmed[:-1]
                     return ''.join(f"{b:02x}" for b in trimmed)
 
-                # Format output
                 crc_str = f"{crc:08x}"
                 page_x = format_page(page1)
                 page_y = format_page(page2)
-
 
             elif sheet_name == 'AlineT':
                 uctypeofTag = int(df.at[aline_field_mapping['uctypeofTag'], col]) if aline_field_mapping['uctypeofTag'] in df.index else 11
@@ -343,7 +497,6 @@ def process_input_sheet(sheet_name, df):
                 comMarkNominal = int(df.at[adj_field_mapping['comMarkNominal'], col]) if adj_field_mapping['comMarkNominal'] in df.index else 0
                 comMarkReverse = int(df.at[adj_field_mapping['comMarkReverse'], col]) if adj_field_mapping['comMarkReverse'] in df.index else 0
 
-
                 tag = TagInfoAdj(
                     uctypeofTag=uctypeofTag,
                     uc_version=uc_version,
@@ -364,8 +517,7 @@ def process_input_sheet(sheet_name, df):
                     while trimmed and trimmed[-1] == 0x00 and len(trimmed) > 6:
                         trimmed = trimmed[:-1]
                     return ''.join(f"{b:02x}" for b in trimmed)
-
-                # Format output
+                
                 crc_str = f"{crc:08x}"
                 page_x = format_page(page1)
                 page_y = format_page(page2)
@@ -389,7 +541,9 @@ def process_input_sheet(sheet_name, df):
 
     return output_df
 
-def process_excel():
+
+
+def process_pdf():
     try:
         if 'input_path' not in request.form or 'output_path' not in request.form:
             return jsonify({"error": "Missing input or output path"}), 400
@@ -416,19 +570,33 @@ def process_excel():
 
         # Generate output file name by appending '_formatted' to input file name
         input_filename = os.path.splitext(os.path.basename(input_path))[0]
-        base_output_filename = f"{input_filename}_formatted"
-        output_extension = '.xlsx'
+        base_output_filename = "37111_MWH_TD_ver2_0_0"
+        output_extension = '.pdf'
         output_file = os.path.join(output_path, f"{base_output_filename}{output_extension}")
         
         # Check for existing files and append (1), (2), etc., if necessary
         if os.path.isfile(output_file):
             os.remove(output_file)
-        
-        wb = Workbook()
+
+        # Setup PDF document
+        doc = SimpleDocTemplate(
+            output_file,
+            pagesize=(A3[1], A3[0]),  # Landscape modex
+            rightMargin=10 * mm,
+            leftMargin=10 * mm,
+            topMargin=10 * mm,
+            bottomMargin=0 * mm
+        )
+        elements = []
+
+        # Add a blank first page
+        elements.extend(get_index_table())
+        elements.append(PageBreak())
+
         all_sheets = pd.read_excel(input_path, sheet_name=None, header=1)
         all_raw = pd.read_excel(input_path, sheet_name=None, header=None)
-        first = True
         processed_sheets = 0
+
 
         for sheet_name, df in all_sheets.items():
             raw_df = all_raw[sheet_name]
@@ -439,27 +607,28 @@ def process_excel():
                 print(f"Skipping sheet {sheet_name} — no valid tag data.")
                 continue
 
-            ws = wb.active if first else wb.create_sheet()
-            ws.title = sheet_name
-            first = False
+            sheet_elements = format_pdf_table(formatted_df, tag_title, sheet_name)
+            elements.extend(sheet_elements)
             processed_sheets += 1
-
-            format_sheet(ws, formatted_df, tag_title)
 
         if processed_sheets == 0:
             return jsonify({"error": "No sheets processed. Output file not saved."}), 400
 
-        wb.save(output_file)
-        print(f"✅ Final Excel saved: {output_file}")
+        doc.build(elements)
+        print(f"✅ Final PDF saved: {output_file}")
 
         return send_file(
             output_file,
             as_attachment=True,
             download_name=os.path.basename(output_file),
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            mimetype="application/pdf"
         )
 
     except Exception as e:
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
 
 
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -4,7 +4,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-from bottom_left_tables import draw_title_block_on_pdf, draw_bottom_right_block_on_pdf, draw_direction_arrows, draw_combined_station_and_border_table, extract_tag_and_tin_ranges
+from components.bottom_left_tables import draw_title_block_on_pdf, draw_bottom_right_block_on_pdf, draw_direction_arrows, draw_combined_station_and_border_table, extract_tag_and_tin_ranges
 from PIL import Image
 import os
 
@@ -29,7 +29,7 @@ def generate_pdf_with_rfid_image():
         if not os.path.isdir(output_path):
             return jsonify({"error": "Invalid output directory"}), 400
 
-        output_file = os.path.join(output_path, "RFID_TIN_Layout.pdf")
+        output_file = os.path.join(output_path, "37111_MWH_RFIDLAYOUT_Ver2_0_0.pdf")
         if os.path.exists(output_file):
             os.remove(output_file)
 
@@ -161,6 +161,8 @@ def generate_pdf_with_rfid_image():
             border_tags=border_tags,
             station_info_path=station_info_path
         )
+        
+        
         
         draw_bottom_right_block_on_pdf(
             c=c,

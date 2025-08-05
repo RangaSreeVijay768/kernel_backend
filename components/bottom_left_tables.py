@@ -1,9 +1,22 @@
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import Table, TableStyle, Paragraph
+from reportlab.platypus import Table, TableStyle, Paragraph, Image
 import pandas as pd
 import re
 from collections import Counter, defaultdict
+from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.lib.units import mm
+from datetime import datetime
+
+
+current_date = datetime.now().strftime("%d.%m.%Y")
+
+styles = getSampleStyleSheet()
+
+
 
 
 def draw_title_block_on_pdf(c, x0, y0, width, total_height):
@@ -59,7 +72,7 @@ def draw_title_block_on_pdf(c, x0, y0, width, total_height):
     c.drawCentredString(x0 + left_width / 2, y0 + lower_height / 2 - 2, "NOT DRAWN     TO SCALE")
 
     c.setFont("Helvetica", 10)
-    c.drawCentredString(x0 + left_width + right_width / 2, y0 + title_block_height / 2 - 5, "RAIL YARD_LAYOUT_MWH_2.0.1")
+    c.drawCentredString(x0 + left_width + right_width / 2, y0 + title_block_height / 2 - 5, "RAIL YARD_LAYOUT_MWH_2.0.0")
 
     # ------------------ Draw Revision History Block ------------------
     rev_x = x0 + 10 + width  # right to title block
@@ -82,8 +95,7 @@ def draw_title_block_on_pdf(c, x0, y0, width, total_height):
     # Data
     c.setFont("Helvetica", 8)
     data = [
-        ["2.0.1", "Initial Version(4.0 Amdt–5.0) updated as per Guidlines change/comments", "21.10.2024"],
-        ["2.0.0", "Initial Version(4.0 Amdt–4.0)", "18.12.2023"],
+        ["2.0.0", "Initial Version(4.0 Amdt–4.0)", current_date],
         ["REV. NO", "REVISION HISTORY", "DATE"],
     ]
 
@@ -246,14 +258,16 @@ def draw_bottom_right_block_on_pdf(c, x0, y0, width, height):
     start_y = middle_y_center + total_text_height / 2 - malwan_font_size
 
     c.setFont("Helvetica-Bold", malwan_font_size)
-    c.drawString(x0 + 5, start_y, "MALWAN (MWH)")
+    c.drawString(x0 + 150, start_y, "MALWAN (MWH)")
+    
 
     c.setFont("Helvetica", layout_font_size)
     layout_y = start_y - layout_font_size - line_spacing
-    c.drawString(x0 + 5, layout_y, "RAIL YARD LAYOUT")
+    c.drawString(x0 + 150, layout_y, "RAIL YARD LAYOUT")
+
 
     # Underline
-    c.line(x0 + 5, layout_y - 1.5, x0 + 70, layout_y - 1.5)
+    # c.line(x0 + 300, layout_y - 1.5, x0 + 70, layout_y - 1.5)
 
     # Lower section columns: [left blank], [drawing no], [SHEET], [SHEETS]
     col1 = x0
@@ -505,10 +519,10 @@ def draw_combined_station_and_border_table(
     border_data = [
         ["BORDER LINE TAGS", "", "", "", ""],
         ["", "DIRECTION", "TAG ID", "DISTANCE FROM\nMID POINT (MWH)", "SIG STRENGTH AS PER\nRSSI SURVEY"],
-        ["KURASTI KALAN SIDE", "UP", f"R-{border_tags[0]}", "3.168KM", "ABOVE –60db"],
-        ["", "DN", f"R-{border_tags[1]}", "2.779KM", "ABOVE –60db"],
-        ["KANSPUR GUGAULI SIDE", "UP", f"R-{border_tags[2]}", "3.984KM", "ABOVE –60db"],
-        ["", "DN", f"R-{border_tags[3]}", "4.586KM", "ABOVE –60db"],
+        ["KURASTI KALAN SIDE", "UP", f"R-{border_tags[0]}", "3.168KM", "ABOVE –70db"],
+        ["", "DN", f"R-{border_tags[1]}", "2.779KM", "ABOVE –70db"],
+        ["KANSPUR GUGAULI SIDE", "UP", f"R-{border_tags[2]}", "3.984KM", "ABOVE –70db"],
+        ["", "DN", f"R-{border_tags[3]}", "4.586KM", "ABOVE –70db"],
     ]
     border_col_widths = [150, 150, 150, 150, 150]
     border_row_heights = [36, 36, 32, 32, 32, 32]
@@ -532,6 +546,10 @@ def draw_combined_station_and_border_table(
     border_table_x = x0 + station_table_width + 20
     border_table.wrapOn(c, border_table_width, sum(border_row_heights))
     border_table.drawOn(c, border_table_x, y0)
+
+
+
+
 
 
     
@@ -702,3 +720,7 @@ def get_station_data_by_id(excel_path, station_id):
 
 # for row in station_data:
 #     print(row)
+
+
+
+
