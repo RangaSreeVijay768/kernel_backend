@@ -18,7 +18,7 @@ def check_documents():
             'TOC_Malwan_station.xlsx'
         ],
         'schematic_plan': [
-            'RFID_TIN_layout.bmp'
+            'RFID_TIN_layout.png'
         ]
     }
 
