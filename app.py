@@ -7,7 +7,7 @@ from components.file_checker import check_documents
 from file_generators.tag_data_excel_formatted_generator import process_excel
 from file_generators.tag_data_pdf_generator import process_pdf
 from file_generators.rfid_pdf_generator import generate_pdf_with_rfid_image
-from file_generators.toc_pdf_generator import generate_toc_pdf_with_header_footer
+from file_generators.toc_pdf_generator import generate_toc_pdf_final
 
 app = Flask(__name__)
 CORS(app)
@@ -57,7 +57,7 @@ def generate_rdid_pdf_route():
 
 @app.route('/api/generate-toc-pdf', methods=['POST'])
 def generate_toc_pdf():
-    return generate_toc_pdf_with_header_footer()
+    return generate_toc_pdf_final()
 
 
 if __name__ == '__main__':

@@ -46,82 +46,920 @@
 
 
 
-from pynput import mouse
-from PIL import Image
-import mss
-import time
-import pyautogui  # For simulating scroll
+# from pynput import mouse
+# from PIL import Image
+# import mss
+# import time
+# import pyautogui  # For simulating scroll
 
-positions = []
+# positions = []
 
-def on_click(x, y, button, pressed):
-    if pressed:
-        print(f"Clicked at: ({x}, {y})")
-        positions.append((x, y))
-        if len(positions) == 2:
-            return False  # Stop listening after two clicks
+# def on_click(x, y, button, pressed):
+#     if pressed:
+#         print(f"Clicked at: ({x}, {y})")
+#         positions.append((x, y))
+#         if len(positions) == 2:
+#             return False  # Stop listening after two clicks
 
-def capture_scrolled_area():
-    print("Click TOP-LEFT corner of the region...")
-    print("Then scroll horizontally if needed, and click BOTTOM-RIGHT corner...")
-    print("Waiting for your clicks...")
+# def capture_scrolled_area():
+#     print("Click TOP-LEFT corner of the region...")
+#     print("Then scroll horizontally if needed, and click BOTTOM-RIGHT corner...")
+#     print("Waiting for your clicks...")
 
-    # Start mouse listener
-    with mouse.Listener(on_click=on_click) as listener:
-        listener.join()
+#     # Start mouse listener
+#     with mouse.Listener(on_click=on_click) as listener:
+#         listener.join()
 
-    x1, y1 = positions[0]
-    x2, y2 = positions[1]
+#     x1, y1 = positions[0]
+#     x2, y2 = positions[1]
 
-    left = min(x1, x2)
-    top = min(y1, y2)
-    width = abs(x2 - x1)
-    height = abs(y2 - y1)
+#     left = min(x1, x2)
+#     top = min(y1, y2)
+#     width = abs(x2 - x1)
+#     height = abs(y2 - y1)
 
-    print(f"Selected area: ({left}, {top}, {width}, {height})")
-    time.sleep(1)  # Give a moment before capture
+#     print(f"Selected area: ({left}, {top}, {width}, {height})")
+#     time.sleep(1)  # Give a moment before capture
 
-    # Initialize variables for scrolling
-    screenshots = []
-    scroll_increment = width  # Scroll by the width of the visible area
-    total_width = width  # Initial width
-    current_scroll = 0
+#     # Initialize variables for scrolling
+#     screenshots = []
+#     scroll_increment = width  # Scroll by the width of the visible area
+#     total_width = width  # Initial width
+#     current_scroll = 0
 
-    with mss.mss() as sct:
-        while True:
-            # Capture the current visible area
-            monitor = {"top": top, "left": left, "width": width, "height": height}
-            img = sct.grab(monitor)
-            screenshots.append(Image.frombytes("RGB", img.size, img.rgb))
+#     with mss.mss() as sct:
+#         while True:
+#             # Capture the current visible area
+#             monitor = {"top": top, "left": left, "width": width, "height": height}
+#             img = sct.grab(monitor)
+#             screenshots.append(Image.frombytes("RGB", img.size, img.rgb))
 
-            # Simulate horizontal scroll (move right)
-            pyautogui.scroll(-scroll_increment)  # Negative to scroll right
-            current_scroll += scroll_increment
-            time.sleep(0.5)  # Wait for scroll to settle
+#             # Simulate horizontal scroll (move right)
+#             pyautogui.scroll(-scroll_increment)  # Negative to scroll right
+#             current_scroll += scroll_increment
+#             time.sleep(0.5)  # Wait for scroll to settle
 
-            # Check if we've scrolled enough (you can adjust this condition)
-            # For simplicity, let's assume we scroll until we can't anymore
-            # You may need to define a max scroll limit or detect scroll end
-            if current_scroll >= width * 2:  # Arbitrary limit; adjust as needed
-                break
+#             # Check if we've scrolled enough (you can adjust this condition)
+#             # For simplicity, let's assume we scroll until we can't anymore
+#             # You may need to define a max scroll limit or detect scroll end
+#             if current_scroll >= width * 2:  # Arbitrary limit; adjust as needed
+#                 break
 
-    # Stitch images horizontally
-    total_width = width * len(screenshots)
-    final_image = Image.new("RGB", (total_width, height))
-    for i, img in enumerate(screenshots):
-        final_image.paste(img, (i * width, 0))
+#     # Stitch images horizontally
+#     total_width = width * len(screenshots)
+#     final_image = Image.new("RGB", (total_width, height))
+#     for i, img in enumerate(screenshots):
+#         final_image.paste(img, (i * width, 0))
 
-    # Save the final image
-    final_image.save("scrolled_region.png")
-    print("✅ Screenshot saved as 'scrolled_region.png'")
+#     # Save the final image
+#     final_image.save("scrolled_region.png")
+#     print("✅ Screenshot saved as 'scrolled_region.png'")
 
-# Run the tool
-if __name__ == "__main__":
-    capture_scrolled_area()
+# # Run the tool
+# if __name__ == "__main__":
+#     capture_scrolled_area()
     
     
     
     
+
+
+
+
+
+
+# import os
+# from io import BytesIO, StringIO
+# from flask import request, jsonify
+# from xlsx2html import xlsx2html
+# import pdfkit
+# from PyPDF2 import PdfReader, PdfWriter
+# from reportlab.pdfgen import canvas
+# from reportlab.platypus import Table, TableStyle
+# from reportlab.lib import colors
+# from reportlab.lib.units import cm
+
+
+# # Dummy functions for header and footer drawing
+# def draw_top_table():
+#     data = [['HEADER TITLE'], ['Generated by System']]
+#     table = Table(data, colWidths=[500])
+#     table.setStyle(TableStyle([
+#         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+#         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+#         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+#         ('FONTSIZE', (0, 0), (-1, -1), 10),
+#         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+#         ('TOPPADDING', (0, 0), (-1, -1), 6),
+#     ]))
+#     return table
+
+# def draw_bottom_tables(current_page, total_pages):
+#     data = [[f'Page {current_page} of {total_pages}', '', 'Confidential']]
+#     table = Table(data, colWidths=[200, 200, 200])
+#     table.setStyle(TableStyle([
+#         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+#         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+#         ('FONTSIZE', (0, 0), (-1, -1), 9),
+#         ('TOPPADDING', (0, 0), (-1, -1), 6),
+#         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+#     ]))
+#     return table
+
+
+# def generate_excel_pdf_with_header_footer():
+#     try:
+#         input_path = request.form.get("input_path")
+#         output_path = request.form.get("output_path")
+
+#         # === Validate inputs ===
+#         if not input_path or not os.path.exists(input_path):
+#             return jsonify({"error": "Invalid or missing Excel path"}), 400
+#         if not output_path:
+#             return jsonify({"error": "Missing output path"}), 400
+
+#         input_path = os.path.abspath(input_path)
+#         output_pdf_path = os.path.join(os.path.abspath(output_path), "Final_Output.pdf")
+#         html_temp_path = os.path.join(output_path, "temp_excel.html")
+
+#         # === Step 1: Convert Excel to HTML ===
+#         with open(html_temp_path, "w", encoding="utf-8") as f:
+#             xlsx2html(input_path, f)
+
+#         # === Step 2: Convert HTML to PDF ===
+#         temp_pdf_path = os.path.join(output_path, "temp_excel.pdf")
+#         options = {
+#             'page-size': 'A4',
+#             'margin-top': '2.7cm',
+#             'margin-bottom': '7cm',
+#             'margin-left': '1.5cm',
+#             'margin-right': '1.5cm',
+#             'encoding': 'UTF-8',
+#             'enable-local-file-access': None
+#         }
+#         pdfkit.from_file(html_temp_path, temp_pdf_path, options=options)
+
+#         # === Step 3: Overlay Header & Footer ===
+#         reader = PdfReader(temp_pdf_path)
+#         writer = PdfWriter()
+#         total_pages = len(reader.pages)
+
+#         for i, page in enumerate(reader.pages):
+#             packet = BytesIO()
+#             width = float(page.mediabox.width)
+#             height = float(page.mediabox.height)
+#             c = canvas.Canvas(packet, pagesize=(width, height))
+
+#             # Top Table
+#             top_table = draw_top_table()
+#             top_table.wrapOn(c, width, height)
+#             top_table.drawOn(c, 1.77 * cm, height - 2.8 * cm)  # 2.8cm from top
+
+#             # Bottom Table
+#             bottom_table = draw_bottom_tables(i + 1, total_pages)
+#             bottom_table.wrapOn(c, width, height)
+#             bottom_table.drawOn(c, 1.77 * cm, 0.6 * cm)  # 0.6cm from bottom
+
+#             c.save()
+#             packet.seek(0)
+#             overlay_page = PdfReader(packet).pages[0]
+#             page.merge_page(overlay_page)
+#             writer.add_page(page)
+
+#         # === Step 4: Save final PDF ===
+#         with open(output_pdf_path, "wb") as f:
+#             writer.write(f)
+
+#         # Optional cleanup
+#         os.remove(html_temp_path)
+#         os.remove(temp_pdf_path)
+
+#         return jsonify({
+#             "message": "PDF generated successfully with header, footer, and Excel content.",
+#             "output_pdf_path": output_pdf_path
+#         })
+
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+
+
+# if __name__ == "__main__":
+#     request = type('obj', (object,), {
+#         'form': {
+#             'input_path': "TOC_Malwan_station.xlsx",
+#             'output_path': "/"
+#         }
+#     })()
+
+#     result = generate_excel_pdf_with_header_footer()
+#     print(result)
+
+
+
+
+# from xlsx2html import xlsx2html
+# from io import StringIO
+# from weasyprint import HTML
+# import os
+
+# def excel_to_pdf_with_weasy(input_excel_path, output_pdf_path):
+#     buffer = StringIO()
+#     xlsx2html(input_excel_path, buffer)
+#     html = buffer.getvalue()
+#     HTML(string=html).write_pdf(output_pdf_path)
     
     
     
+    
+# from xlsx2html import xlsx2html
+# from io import StringIO
+
+# def get_excel_as_html(input_excel_path) -> str:
+#     buffer = StringIO()
+#     xlsx2html(input_excel_path, buffer)
+#     html_code = buffer.getvalue()
+
+#     # Fix invalid valign attributes and styles
+#     html_code = html_code.replace('valign="CENTER"', 'valign="middle"')
+#     html_code = html_code.replace('valign="TOP"', 'valign="top"')
+#     html_code = html_code.replace('valign="BOTTOM"', 'valign="bottom"')
+#     html_code = html_code.replace('vertical-align: center', 'vertical-align: middle')
+#     html_code = html_code.replace('vertical-align: CENTER', 'vertical-align: middle')
+
+#     return html_code
+    
+
+# html_content = get_excel_as_html("TOC_Malwan_station.xlsx")
+    
+# with open("output.html", "w", encoding="utf-8") as f:
+#     f.write(html_content)
+
+    
+
+
+# from xhtml2pdf import pisa
+# import os
+
+
+# def html_to_pdf_xhtml2pdf(html_file_path, output_pdf_path):
+#     # Read the HTML file
+#     with open(html_file_path, "r", encoding="utf-8") as html_file:
+#         html_string = html_file.read()
+    
+#     # Generate PDF from HTML string
+#     with open(output_pdf_path, "wb") as f:
+#         pisa.CreatePDF(html_string, dest=f)
+
+# if __name__ == "__main__":
+#     html_file_path = "output.html"     # Replace with your HTML file path
+#     output_pdf_path = "output.pdf"
+
+#     html_to_pdf_xhtml2pdf(html_file_path, output_pdf_path)
+
+
+
+
+
+# import excel2img
+# from reportlab.pdfgen import canvas
+# from reportlab.lib.pagesizes import A4
+# import os
+
+# def excel_to_pdf_image_based(excel_path, output_pdf_path):
+#     # Step 1: Convert Excel sheet to image
+#     img_path = "temp_excel_image.png"
+#     excel2img.export_img(excel_path, img_path, "TOC")  # Change sheet name if needed
+
+#     # Step 2: Insert image into PDF using ReportLab
+#     c = canvas.Canvas(output_pdf_path, pagesize=A4)
+#     width, height = A4
+
+#     # Resize image to fit A4 page
+#     c.drawImage(img_path, 0, 0, width=width, height=height)
+#     c.showPage()
+#     c.save()
+
+#     # Cleanup temporary image
+#     os.remove(img_path)
+
+#     print("✅ PDF created successfully at:", output_pdf_path)
+
+# # ========= MAIN ==========
+# if __name__ == "__main__":
+#     input_excel = "TOC_Malwan_station.xlsx"
+#     output_pdf = "output.pdf"
+
+#     excel_to_pdf_image_based(input_excel, output_pdf)
+
+
+
+
+
+# from spire.xls import *
+# from spire.xls.common import *
+
+# # Create a Workbook object
+# workbook = Workbook()
+
+# # Load the Excel file
+# workbook.LoadFromFile("TOC_Malwan_station.xlsx")
+
+# # Get the first worksheet
+# sheet = workbook.Worksheets[0]
+
+# # === Page Setup Settings ===
+# sheet.PageSetup.PaperSize = PaperSizeType.PaperA3
+# sheet.PageSetup.Orientation = PageOrientationType.Landscape
+# sheet.PageSetup.FitToPagesWide = 1     # Fit width to 1 page
+# sheet.PageSetup.FitToPagesTall = 0     # Let height span multiple pages if needed
+
+# # Save as PDF
+# sheet.SaveToPdf("WorksheetToPdf.pdf")
+
+# # Dispose resources
+# workbook.Dispose()
+
+
+import fitz  # PyMuPDF
+
+def remove_spire_watermark_text_only(input_pdf: str, output_pdf: str):
+    watermark_keywords = ["Evaluation Warning", "Spire.XLS"]
+
+    doc = fitz.open(input_pdf)
+
+    for page in doc:
+        blocks = page.get_text("dict")["blocks"]
+
+        for b in blocks:
+            if "lines" not in b:
+                continue
+            for l in b["lines"]:
+                for s in l["spans"]:
+                    for keyword in watermark_keywords:
+                        if keyword in s["text"]:
+                            rect = fitz.Rect(s["bbox"])
+                            page.add_redact_annot(rect, fill=None)
+
+        page.apply_redactions()
+
+    doc.save(output_pdf)
+    doc.close()
+    print(f"✅ Watermark removed: {output_pdf}")
+
+
+# remove_spire_watermark_text_only("WorksheetToPdf.pdf", "without_watermark.pdf")
+
+
+# import fitz  # PyMuPDF
+# import tempfile
+# import os
+# from spire.xls import *
+# from spire.xls.common import *
+
+# def convert_excel_to_clean_pdf(excel_path: str, output_pdf: str):
+#     # Step 1: Create and configure workbook
+#     workbook = Workbook()
+#     workbook.LoadFromFile(excel_path)
+#     sheet = workbook.Worksheets[0]
+
+#     # Set page layout: A3 landscape and fit width
+#     sheet.PageSetup.PaperSize = PaperSizeType.PaperA3
+#     sheet.PageSetup.Orientation = PageOrientationType.Landscape
+#     sheet.PageSetup.FitToPagesWide = 1
+#     sheet.PageSetup.FitToPagesTall = 0
+
+#     # Step 2: Save to temporary PDF with watermark
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+#         temp_pdf_path = tmp_pdf.name
+#     sheet.SaveToPdf(temp_pdf_path)
+#     workbook.Dispose()
+
+#     # Step 3: Remove watermark from temp PDF
+#     watermark_keywords = ["Evaluation Warning", "Spire.XLS"]
+#     doc = fitz.open(temp_pdf_path)
+
+#     for page in doc:
+#         blocks = page.get_text("dict")["blocks"]
+#         for b in blocks:
+#             if "lines" not in b:
+#                 continue
+#             for l in b["lines"]:
+#                 for s in l["spans"]:
+#                     for keyword in watermark_keywords:
+#                         if keyword in s["text"]:
+#                             rect = fitz.Rect(s["bbox"])
+#                             page.add_redact_annot(rect, fill=None)
+#         page.apply_redactions()
+
+#     doc.save(output_pdf)
+#     doc.close()
+
+#     # Step 4: Clean up temporary file
+#     os.remove(temp_pdf_path)
+
+#     print(f"✅ Clean PDF saved to: {output_pdf}")
+
+
+
+# convert_excel_to_clean_pdf("TOC_Malwan_station.xlsx", "without_watermark.pdf")
+
+
+
+# import fitz  # PyMuPDF
+# import tempfile
+# import os
+# from spire.xls import *
+# from spire.xls.common import *
+
+# def convert_excel_to_clean_pdf(excel_path: str, output_pdf: str):
+#     # Step 1: Load Excel and configure
+#     workbook = Workbook()
+#     workbook.LoadFromFile(excel_path)
+#     sheet = workbook.Worksheets[0]
+#     sheet.PageSetup.PaperSize = PaperSizeType.PaperA3
+#     sheet.PageSetup.Orientation = PageOrientationType.Landscape
+#     sheet.PageSetup.FitToPagesWide = 1
+#     sheet.PageSetup.FitToPagesTall = 0
+
+#     # Step 2: Export to temp PDF
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+#         temp_pdf_path = tmp_pdf.name
+#     sheet.SaveToPdf(temp_pdf_path)
+#     workbook.Dispose()
+
+#     # Step 3: Remove watermark using white overlays (NOT redaction)
+#     watermark_keywords = ["Evaluation Warning", "Spire.XLS"]
+#     doc = fitz.open(temp_pdf_path)
+
+#     for page in doc:
+#         blocks = page.get_text("dict")["blocks"]
+#         for b in blocks:
+#             if "lines" not in b:
+#                 continue
+#             for l in b["lines"]:
+#                 for s in l["spans"]:
+#                     for keyword in watermark_keywords:
+#                         if keyword in s["text"]:
+#                             rect = fitz.Rect(s["bbox"])
+#                             page.draw_rect(rect, color=(1, 1, 1), fill=(1, 1, 1))  # Draw white box
+
+#     doc.save(output_pdf)
+#     doc.close()
+
+#     # Step 4: Delete temp file
+#     os.remove(temp_pdf_path)
+
+#     print(f"✅ Clean PDF saved to: {output_pdf}")
+
+# # Example usage
+# convert_excel_to_clean_pdf("TOC_Malwan_station.xlsx", "without_watermark.pdf")
+
+
+
+
+
+
+
+# import aspose.cells
+# from aspose.cells import Workbook
+# workbook = Workbook("TOC_Malwan_station.xlsx")
+# workbook.save("Output.pdf")
+
+
+# import aspose.cells
+# from aspose.cells import Workbook, PdfSaveOptions, PaperSizeType, PageOrientationType
+# import os
+# import tempfile
+# import fitz
+
+
+
+# def clean_watermark_and_extra_pages(input_pdf_path: str, output_pdf_path: str):
+#     doc = fitz.open(input_pdf_path)
+#     new_doc = fitz.open()
+
+#     watermark_phrase = "Evaluation Only. Created with Aspose.Cells for Python via .NET. Copyright 2003 - 2025 Aspose Pty Ltd."
+
+#     for page_num in range(len(doc)):
+#         page = doc.load_page(page_num)
+#         text_instances = page.search_for(watermark_phrase)
+
+#         # Remove watermark text (if found)
+#         for inst in text_instances:
+#             page.add_redact_annot(inst, fill=(1, 1, 1))  # White-out
+#         if text_instances:
+#             page.apply_redactions()
+
+#         # After redaction, check again if page is blank
+#         remaining_text = page.get_text().strip()
+#         if remaining_text == "" or remaining_text == watermark_phrase:
+#             continue  # Skip empty/junk pages
+
+#         new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
+
+#     if new_doc.page_count == 0:
+#         print("⚠️ All pages contained watermark or were empty. Saving original PDF.")
+#         doc.save(output_pdf_path)
+#     else:
+#         new_doc.save(output_pdf_path)
+#         print(f"✅ Clean PDF saved as: {output_pdf_path}")
+
+#     new_doc.close()
+#     doc.close()
+
+
+
+
+# def add_padding_to_excel_rows(input_excel_path: str) -> str:
+#     # Load the original workbook
+#     workbook = Workbook(input_excel_path)
+
+#     # Loop through each worksheet
+#     for sheet in workbook.worksheets:
+#         max_row = sheet.cells.max_data_row
+#         for row in range(max_row + 1):
+#             original_height = sheet.cells.get_row_height(row)
+#             sheet.cells.set_row_height(row, original_height + 8)
+
+#         # Set A3 Landscape
+#         sheet.page_setup.paper_size = PaperSizeType.PAPER_A3
+#         sheet.page_setup.orientation = PageOrientationType.LANDSCAPE
+
+#         # Fit all columns in one page width
+#         sheet.page_setup.fit_to_pages_wide = 1
+#         sheet.page_setup.fit_to_pages_tall = 0
+
+#     # Create a temporary file path
+#     fd, temp_path = tempfile.mkstemp(suffix=".xlsx")
+#     os.close(fd)
+#     workbook.save(temp_path)
+#     return temp_path
+
+# # === Usage ===
+# modified_excel_path = add_padding_to_excel_rows("TOC_Malwan_station.xlsx")
+
+# # Load modified workbook
+# workbook = Workbook(modified_excel_path)
+
+# # Set PDF save options
+# pdf_options = PdfSaveOptions()
+# pdf_options.one_page_per_sheet = False
+# pdf_options.all_columns_in_one_page_per_sheet = True
+
+# # Save as A3 landscape PDF
+# workbook.save("Output.pdf", pdf_options)
+
+# clean_watermark_and_extra_pages("Output.pdf", "Final_Output.pdf")
+
+# # Cleanup
+# os.remove(modified_excel_path)
+
+
+
+
+
+
+import os
+import tempfile
+import fitz
+from aspose.cells import Workbook, PdfSaveOptions, PaperSizeType, PageOrientationType
+from reportlab.platypus import Table, TableStyle, Image
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import mm, cm
+
+
+def get_first_page_table():
+    data = [
+        ["SIGNAL & TELECOMMUNICATION", ''],
+        ["TRAIN COLLISION AVOIDANCE SYSTEM (TCAS) - KAVACH", ''],
+        ["TABLE OF CONTROL (TOC)", ''],
+        ['Zone', 'NC Railway'],
+        ['Division', 'Prayagraj Division, NC Railway'],
+        ['Section', '-'],
+        ['Station Name', 'MALWAN'],
+        ['Station Code', 'MWH'],
+        ['Station ID', '37111'],
+        ['REF SIP No.', 'SI-3067/1'],
+        ['REf RFID Tag Layout No.', 'RFID_TAG_LAYOUT_MWH_2.0.0'],
+        ['TOC Version', '2.0.0']
+    ]
+
+    table = Table(data, colWidths=[270, 370], rowHeights=[50]*12)
+    table.setStyle(TableStyle([
+        ('SPAN', (0,0), (-1,0)),
+        ('SPAN', (0,1), (-1,1)),
+        ('SPAN', (0,2), (-1,2)),
+        ('ALIGN', (0,0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('FONTNAME', (0,0), (-1,2), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,2), 11),
+        ('FONTNAME', (0,3), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,3), (-1,-1), 10),
+        ('GRID', (0,0), (-1,-1), 0.8, colors.black),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+    ]))
+
+    return table
+
+
+
+def draw_top_table():
+    data_top = [
+        ["TABLE OF CONTROL", "", "", "", "", ""],
+        ["Station Name:", "MALWAN", "Division:", "PRAYAGRAJ", "CODE", "MWH"],
+        ["Station ID:", "37111", "Section:", "NC Railway", "", ""],
+    ]
+
+    col_widths_top = [125, 150, 125, 160, 160, 266]
+    row_heights_top = [20, 25, 25]
+
+    table_top = Table(data_top, colWidths=col_widths_top, rowHeights=row_heights_top)
+
+    style_top = TableStyle([
+        # Grid and alignment
+        ('GRID', (0,1), (-1,-1), 0.5, colors.black),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+
+        # Font size: full table = 6 first
+        ('FONTSIZE', (0,1), (-1,2), 6),
+
+        # Title row font size
+        ('FONTSIZE', (0,0), (-1,0), 10),
+
+        # Bold column labels
+        ('FONTNAME', (0,1), (0,2), 'Helvetica-Bold'),
+        ('FONTNAME', (2,1), (2,2), 'Helvetica-Bold'),
+        ('FONTNAME', (4,1), (4,2), 'Helvetica-Bold'),
+
+        # Backgrounds for labels
+        ('BACKGROUND', (0,1), (0,2), colors.lightgrey),
+        ('BACKGROUND', (2,1), (2,2), colors.lightgrey),
+        ('BACKGROUND', (4,1), (4,2), colors.lightgrey),
+
+        # Spans
+        ('SPAN', (0,0), (5,0)),        # Title row
+        ('SPAN', (4,1), (4,2)),        # CODE
+        ('SPAN', (5,1), (5,2)),
+    ])
+
+    table_top.setStyle(style_top)
+    return table_top
+
+
+def draw_bottom_tables(current_page, total_pages):
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    files_dir = os.path.join(base_dir, "files")
+
+    sign1_path = os.path.join(files_dir, "sign1.png")
+    sign2_path = os.path.join(files_dir, "sign2.png")
+    logo_path = os.path.join(files_dir, "logo.png")
+
+    sign1 = Image(sign1_path, width=2*cm, height=1*cm)
+    sign2 = Image(sign2_path, width=2*cm, height=1*cm)
+    logos = Image(logo_path, width=2*cm, height=1*cm)
+
+    # Adjusted widths to fit within 842 pts (landscape A4)
+    toc1_col_widths = [65, 65, 65, 70, 70]     # ~475
+    toc2_col_widths = [80, 80, 80]             # ~300
+    toc3_col_widths = [60, 80, 33, 85, 60, 43, 43]
+    toc1_row_heights = [35, 33, 33, 35, 35, 67, 35, 33]
+    toc2_row_heights = [27, 27, 53, 47, 97, 27, 27]
+    toc3_row_heights = [48, 30, 30, 44, 43, 48, 15, 48]
+
+
+    # Adjust TOC1
+    data_toc1 = [
+        ["MALWAN(MWH), PRAYAGRAJ DIVISION, NC RAILWAY", "", "", "", ""],
+        ["REF : SIP : SSP.NCR.PRYJ.MWH2.0.0", "", "", "", ""],
+        ["REF: RFID_TAG_LAYOUT_MWH_2.0.0", "", "", "", ""],
+        ["TABLE OF CONTROL: 37111_MWH_TOC_Ver2_0_0", "", "", "", ""],
+        ["", "PREPARED BY", "CHECKED BY", "VERIFIED BY", ""],
+        ["SIGN", "", "", "", ""],
+        ["NAME", "", "", "", ""],
+        ["DESIGNATION", "", "", "", ""]
+    ]
+    table_toc1 = Table(data_toc1, colWidths=toc1_col_widths, rowHeights=toc1_row_heights)
+    table_toc1.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 6),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (-1, 3), "LEFT"),
+        ("GRID", (0, 0), (-1, -1), 0.7, colors.black),
+        ("SPAN", (0, 0), (-1, 0)),
+        ("SPAN", (0, 1), (-1, 1)),
+        ("SPAN", (0, 2), (-1, 2)),
+        ("SPAN", (0, 3), (-1, 3)),
+        ("SPAN", (4, 5), (4, 6)),
+        ("SPAN", (4, 7), (4, 7)),
+        ("TOPPADDING", (0, 0), (-1, -1), 8)
+    ]))
+
+    # Adjust TOC2
+    data_toc2 = [
+        ["Remarks", "", ""],
+        ["REVISION HISTORY IS AVAILABLE ON PAGE-12", "", ""],
+        ["", "", ""],
+        ["", "", ""],
+        ["DY.CSTE/P-1/PRYJ", "SSTE/Pr/PRYJ", "SSE/SIG/PRYJ"],
+        ["", "", ""],
+        ["NOTE:", "", ""]
+    ]
+    table_toc2 = Table(data_toc2, colWidths=toc2_col_widths, rowHeights=toc2_row_heights)
+    table_toc2.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.7, colors.black),
+        ("ALIGN", (0, 0), (-1, 5), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
+        ("FONTNAME", (0, 5), (-1, 5), "Helvetica-Bold"),
+        ("FONTNAME", (0, 6), (2, 6), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 6), (2, 6), 7),
+        ("FONTSIZE", (0, 0), (-1, -1), 6),
+        ("ALIGN", (0, 6), (0, 6), "LEFT"),
+        ("SPAN", (0, 0), (-1, 0)),
+        ("SPAN", (0, 1), (-1, 1)),
+        ("TOPPADDING", (0, 0), (-1, -1), 8)
+    ]))
+
+    # Adjust TOC3
+    data_toc3 = [
+        ["SIP: D-3067/1", "REF: SIG.PLAN.No.", "", "MALWAN(MWH)", "", "", ""],
+        ["", "REVISION", "", "SIGNAL & TELECOMMUNICATION", "", "", ""],
+        ["", "DRAWING", "", "KAVACH Indian Railway ATP", "", "", ""],
+        ["", "DY.CSTE/D&D/PRYJ", "C\nH\nE\nC\nK\nE\nD", "PRAYAGRAJ DIVISION, NC RAILWAY", "", "", ""],
+        ["", "SSTE/D&D/PRYJ", "", "TABLE OF CONTROL:KAVACH_TOC_MWH_4.0.0", "", "", ""],
+        ["", "ASTE/D&D/PRYJ", "", "", "KAVACH\nD-3067/1", "", ""],
+        ["", "", "", "N.C.R RLY.DRG.NO:", "", "SHEET", "SHEETS"],
+        ["", "\nSSE/D&D/PRYJ", "", "", "", str(current_page), str(total_pages)],
+    ]
+    table_toc3 = Table(data_toc3, colWidths=toc3_col_widths, rowHeights=toc3_row_heights)
+    table_toc3.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.7, colors.black),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTSIZE', (0,0), (-1,-1), 6),
+        ("FONTNAME", (0, 0), (7, 7), "Helvetica-Bold"),
+        ('SPAN', (0,0), (0,0)),
+        ('SPAN', (0,6), (0,7)),
+        ('SPAN', (1,0), (2,0)),
+        ('SPAN', (1,1), (2,1)),
+        ('SPAN', (1,2), (2,2)),
+        ('SPAN', (1,6), (1,7)),
+        ('SPAN', (3,0), (6,0)),
+        ('SPAN', (3,1), (6,1)),
+        ('SPAN', (3,2), (6,2)),
+        ('SPAN', (3,3), (6,3)),
+        ('SPAN', (3,4), (6,4)),
+        ('SPAN', (3,6), (3,6)),
+        ('SPAN', (2,3), (2,7)),
+        ('SPAN', (4,5), (4,7)),
+        ('SPAN', (3,7), (3,7)),
+        ('SPAN', (5,6), (5,6)),
+        ('SPAN', (6,6), (6,6)),
+        ('SPAN', (5,7), (5,7)),
+        ('SPAN', (6,7), (6,7)),
+        ("TOPPADDING", (0, 0), (-1, -1), 8)
+    ]))
+
+    # Combine the three TOCs
+    bottom_table = Table([[table_toc1, table_toc2, table_toc3]],
+                         colWidths=[sum(toc1_col_widths),
+                                    sum(toc2_col_widths, 8),
+                                    sum(toc3_col_widths)])
+    bottom_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    ]))
+    return bottom_table
+
+import os
+import fitz  # PyMuPDF
+from aspose.cells import Workbook, PdfSaveOptions, PaperSizeType, PageOrientationType
+from PyPDF2 import PdfReader, PdfWriter
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import cm
+from reportlab.platypus import Table
+
+
+def generate_clean_pdf(input_excel_path: str, output_pdf_path: str):
+    # Step 1: Generate intermediate PDF using Aspose
+    temp_pdf_path = "temp_output.pdf"
+    workbook = Workbook(input_excel_path)
+
+    for sheet in workbook.worksheets:
+        print(f"Before unprotect - Sheet: {sheet.name}, Protected: {sheet.is_protected}")
+        if sheet.is_protected:
+            sheet.unprotect()  # No password
+        print(f"After unprotect  - Sheet: {sheet.name}, Protected: {sheet.is_protected}")
+        max_row = sheet.cells.max_data_row
+        for row in range(max_row + 1):
+            original_height = sheet.cells.get_row_height(row)
+            sheet.cells.set_row_height(row, original_height + 50)
+
+        sheet.page_setup.paper_size = PaperSizeType.PAPER_A4
+        sheet.page_setup.orientation = PageOrientationType.PORTRAIT
+        sheet.page_setup.fit_to_pages_wide = 2
+        sheet.page_setup.fit_to_pages_tall = 0
+
+    pdf_options = PdfSaveOptions()
+    pdf_options.one_page_per_sheet = False
+    pdf_options.all_columns_in_one_page_per_sheet = True
+
+    workbook.save(temp_pdf_path, pdf_options)
+
+    # Step 2: Remove watermark pages
+    watermark_phrase = "Evaluation Only. Created with Aspose.Cells for Python via .NET. Copyright 2003 - 2025 Aspose Pty Ltd."
+    cleaned_pdf_path = "temp_cleaned.pdf"
+
+    doc = fitz.open(temp_pdf_path)
+    new_doc = fitz.open()
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        text_instances = page.search_for(watermark_phrase)
+        for inst in text_instances:
+            page.add_redact_annot(inst, fill=(1, 1, 1))
+        if text_instances:
+            page.apply_redactions()
+        if page.get_text().strip() not in ("", watermark_phrase):
+            new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
+    new_doc.save(cleaned_pdf_path)
+    new_doc.close()
+    doc.close()
+    os.remove(temp_pdf_path)
+
+    # Step 3: Add top/bottom margins and overlay
+    reader = PdfReader(cleaned_pdf_path)
+    writer = PdfWriter()
+    total_pages = len(reader.pages)
+    top_margin = 50
+    bottom_margin = 300
+
+    # === First Page: Blank with center table ===
+    first_page_width = float(reader.pages[0].mediabox.width)
+    first_page_height = float(reader.pages[0].mediabox.height) + top_margin + bottom_margin
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=(first_page_width, first_page_height))
+
+    # Draw first page table centered
+    first_table: Table = get_first_page_table()
+    w, h = first_table.wrap(0, 0)
+    x = (first_page_width - w) / 2
+    y = (first_page_height - h) / 2
+    first_table.drawOn(c, x, y)
+    c.save()
+
+    buffer.seek(0)
+    first_page = PdfReader(buffer).pages[0]
+    writer.add_page(first_page)
+
+    # === Remaining Pages: Add top/bottom tables ===
+    for i, page in enumerate(reader.pages, start=1):  # Start from page 1 (after blank)
+        orig_width = float(page.mediabox.width)
+        orig_height = float(page.mediabox.height)
+        new_height = orig_height + top_margin + bottom_margin
+
+        packet = BytesIO()
+        c = canvas.Canvas(packet, pagesize=(orig_width, new_height))
+
+        # Top table
+        top_table = draw_top_table()
+        top_table.wrapOn(c, orig_width, new_height)
+        top_table.drawOn(c, 1.77 * cm, new_height - top_margin - 40)
+
+        # Bottom table
+        bottom_table = draw_bottom_tables(i, total_pages)
+        bottom_table.wrapOn(c, orig_width, new_height)
+        bottom_table.drawOn(c, 1.77 * cm, 1.4 * cm)
+
+        c.save()
+        packet.seek(0)
+        overlay = PdfReader(packet).pages[0]
+
+        # Resize and shift original content
+        page.mediabox.upper_right = (orig_width, new_height)
+        page.add_transformation([1, 0, 0, 1, 0, bottom_margin])  # shift up
+
+        # Merge overlay
+        page.merge_page(overlay)
+        writer.add_page(page)
+
+    # === Save Final PDF ===
+    with open(output_pdf_path, "wb") as f:
+        writer.write(f)
+
+    os.remove(cleaned_pdf_path)
+    print(f"✅ Final cleaned PDF with first table page and top/bottom overlays saved: {output_pdf_path}")
+
+
+
+
+generate_clean_pdf("TOC_Malwan_station.xlsx", "Final_Output.pdf")
+
+
+
