@@ -67,7 +67,7 @@ def upload_input_file():
 
     try:    
         filename = secure_filename(file.filename)
-        target_dir = os.path.join(base_path, "Output_Documents", station, "inputs")
+        target_dir = os.path.join(base_path, "Input_Documents", station, "")
         os.makedirs(target_dir, exist_ok=True)
         file.save(os.path.join(target_dir, filename))
         return jsonify({"success": True})
